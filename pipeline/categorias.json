@@ -1,0 +1,18 @@
+[
+  { "slug": "noticias",     "label": "NOTÍCIAS",      "nome": "Notícias do Brasil",        "cor": "#FF0000" },
+  { "slug": "urgente",      "label": "URGENTE",       "nome": "Urgente / Última hora",     "cor": "#FF0000" },
+  { "slug": "mundo",        "label": "MUNDO",         "nome": "Mundo / Internacional",     "cor": "#FF0000" },
+  { "slug": "esportes",     "label": "ESPORTES",      "nome": "Esportes",                  "cor": "#FF0000" },
+  { "slug": "famosos",      "label": "FAMOSOS",       "nome": "Famosos e Entretenimento",  "cor": "#FF0000" },
+  { "slug": "curiosidades", "label": "CURIOSIDADES",  "nome": "Curiosidades",              "cor": "#FF0000" },
+  { "slug": "viral",        "label": "VIRAL",         "nome": "Viral / Inacreditável",     "cor": "#FF0000" },
+  { "slug": "emocionante",  "label": "EMOCIONANTE",   "nome": "Histórias emocionantes",    "cor": "#FF0000" },
+  { "slug": "humor",        "label": "HUMOR",         "nome": "Humor",                     "cor": "#FF0000" },
+  { "slug": "animais",      "label": "ANIMAIS",       "nome": "Animais",                   "cor": "#FF0000" },
+  { "slug": "natureza",     "label": "NATUREZA",      "nome": "Natureza, clima e desastres", "cor": "#FF0000" },
+  { "slug": "ciencia",      "label": "CIÊNCIA",       "nome": "Ciência e Espaço",          "cor": "#FF0000" },
+  { "slug": "tecnologia",   "label": "TECNOLOGIA",    "nome": "Tecnologia e IA",           "cor": "#FF0000" },
+  { "slug": "saude",        "label": "SAÚDE",         "nome": "Saúde e Bem-estar",         "cor": "#FF0000" },
+  { "slug": "economia",     "label": "ECONOMIA",      "nome": "Economia e Dinheiro",       "cor": "#FF0000" },
+  { "slug": "policia",      "label": "POLÍCIA",       "nome": "Polícia e Segurança",       "cor": "#FF0000" }
+]

@@ -1,0 +1,21 @@
+name: Limpar vídeos antigos
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  limpar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests yt-dlp anthropic pillow
+      - working-directory: pipeline
+        env:
+          SUPABASE_URL: https://ilnmrhgnaojgykkresfi.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python main.py --limpar

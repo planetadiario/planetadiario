@@ -1,0 +1,4 @@
+anthropic>=1.0
+yt-dlp[default,curl-cffi]
+requests>=2.32
+pillow>=11.0
