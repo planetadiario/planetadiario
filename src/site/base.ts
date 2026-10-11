@@ -100,6 +100,7 @@ export interface Leitor {
   pontos: number;
   assinante: boolean;
   fimAssinatura: string | null;
+  admin: boolean;
 }
 
 export function useLeitor() {
@@ -108,9 +109,10 @@ export function useLeitor() {
   useEffect(() => {
     async function carregar(user: User | null | undefined) {
       if (!user) return setLeitor(null);
-      const [perfil, ass] = await Promise.all([
+      const [perfil, ass, admin] = await Promise.all([
         supabase.from("perfis").select("nome, avatar, pontos").eq("id", user.id).maybeSingle(),
         supabase.from("assinaturas").select("fim").eq("usuario_id", user.id).eq("status", "ativa").gt("fim", new Date().toISOString()).order("fim", { ascending: false }).limit(1).maybeSingle(),
+        supabase.rpc("is_admin"),
       ]);
       setLeitor({
         user,
@@ -119,6 +121,7 @@ export function useLeitor() {
         pontos: perfil.data?.pontos ?? 0,
         assinante: !!ass.data,
         fimAssinatura: ass.data?.fim ?? null,
+        admin: admin.data === true,
       });
     }
     supabase.auth.getSession().then(({ data }) => carregar(data.session?.user));

@@ -47,6 +47,14 @@ export default function Login() {
               {estado === "enviando" ? "Enviando…" : "Receber link de acesso"}
             </button>
             {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
+            <div className="my-4 flex items-center gap-3 text-xs text-suave"><span className="h-px flex-1 bg-borda" />ou<span className="h-px flex-1 bg-borda" /></div>
+            <button
+              type="button"
+              onClick={() => supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/painel` } })}
+              className="w-full rounded-lg border border-borda bg-painel py-2.5 font-medium hover:bg-painel-2"
+            >
+              Entrar com o Google
+            </button>
           </>
         )}
       </form>

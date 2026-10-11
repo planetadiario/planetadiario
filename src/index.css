@@ -17,12 +17,12 @@
   color-scheme: light;
 }
 .dark {
-  --fundo: #0d1117;
-  --painel: #141922;
-  --painel-2: #1b2230;
-  --borda: #252d3b;
-  --texto: #e8edf5;
-  --suave: #8b97ab;
+  --fundo: #111111;
+  --painel: #1a1a1a;
+  --painel-2: #232323;
+  --borda: #2c2c2c;
+  --texto: #ededed;
+  --suave: #9a9a9a;
   --marca: #ff2d36;
   --globo: #3b82f6;
   --fb: #3b82f6;

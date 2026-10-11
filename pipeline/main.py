@@ -51,7 +51,8 @@ def enviar_arquivo(caminho: str, arquivo: Path, tipo: str) -> str:
             data=f, timeout=600,
         )
     r.raise_for_status()
-    return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET}/{caminho}"
+    # ?v= muda a cada montagem: navegador e CDN não reaproveitam a versão antiga
+    return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET}/{caminho}?v={int(time.time())}"
 
 
 # ---------- Download ----------

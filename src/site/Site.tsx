@@ -104,11 +104,16 @@ function BotaoConta({ leitor }: { leitor: Leitor | null | undefined }) {
       </button>
     );
   return (
+    <>
+    {leitor.admin && (
+      <a href="/painel" className="rounded-full bg-texto px-3 py-1.5 text-sm font-semibold text-fundo">Painel</a>
+    )}
     <a href="/conta" onClick={aoClicar("/conta")} className="flex items-center gap-2 rounded-full border border-borda bg-painel py-1 pl-1 pr-3 text-sm hover:bg-painel-2">
       <Avatar nome={leitor.nome} url={leitor.avatar} />
       <span className="hidden max-w-28 truncate sm:inline">{leitor.nome.split(" ")[0]}</span>
       {leitor.assinante && <SeloAssinante />}
     </a>
+    </>
   );
 }
 
