@@ -79,10 +79,10 @@ function CartaoMolde({ cat, exemplo, rodape, atualizado }: { cat: Cat; exemplo: 
     <div className={`cartao overflow-hidden ${cat.ativa ? "" : "opacity-60"}`}>
       {/* prévia 9:16 com as mesmas proporções do vídeo final */}
       <div className="relative aspect-[9/16] bg-gradient-to-b from-slate-500 via-slate-700 to-slate-900 [container-type:inline-size]">
-        <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-b from-transparent to-black/90" />
+        <div className="absolute inset-x-0 bottom-0 h-[53%] bg-gradient-to-b from-transparent via-black/70 to-black/90" />
         <img src={src} alt={`Molde ${cat.label}`} className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-x-[5.5%] top-[78.5%] text-center">
-          <p className="line-clamp-4 font-bold leading-[1.18] text-white" style={{ fontSize: "6.4cqw", fontFamily: "Montserrat, Inter, sans-serif" }}>
+        <div className="absolute inset-x-[6.5%] top-[64.8%] text-center">
+          <p className="line-clamp-3 font-bold leading-[1.18] text-white" style={{ fontSize: "5.9cqw", fontFamily: "Montserrat, Inter, sans-serif" }}>
             {exemplo}
           </p>
           {rodape && <p className="mt-[1.5cqw] font-semibold text-[#ff2828]" style={{ fontSize: "3.1cqw" }}>{rodape}</p>}

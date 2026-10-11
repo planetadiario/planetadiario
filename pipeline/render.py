@@ -14,12 +14,14 @@ MOLDES = RAIZ / "assets" / "moldes"
 FONTE = RAIZ / "fonts" / "Montserrat.ttf"
 
 W, H = 1080, 1920
+# Tudo dentro da área segura do Instagram: o feed recorta 4:5 (y 285–1635) e a
+# interface do Reel cobre a base; por isso texto termina em ~80% da altura.
 # vídeo horizontal: área entre a logo e a faixa da categoria (molde escalado p/ 1080x1920)
-CAIXA_Y0, CAIXA_Y1 = 255, 1390
+CAIXA_Y0, CAIXA_Y1 = 450, 1150
 # manchete: abaixo da faixa da categoria
-TEXTO_Y0, TEXTO_Y1 = 1500, 1800
-TEXTO_MARGEM = 60
-DEGRADE_Y0 = 1180
+TEXTO_Y0, TEXTO_Y1 = 1236, 1545
+TEXTO_MARGEM = 70
+DEGRADE_Y0 = 900
 COR_RODAPE = (255, 40, 40, 255)
 DURACAO_MAX = 90
 
@@ -64,13 +66,13 @@ def camada(molde: Path, manchete: str, rodape: str, destino: Path) -> Path:
     f_rod = fonte(34, "SemiBold")
     alt_rod = 34 + 26 if rodape else 0
     altura_max = TEXTO_Y1 - TEXTO_Y0 - alt_rod
-    for tam in range(72, 42, -2):
+    for tam in range(64, 38, -2):
         f = fonte(tam, "Bold")
         linhas = quebrar(manchete, f, largura, d)
         alt_linha = int(tam * 1.18)
-        if len(linhas) <= 4 and alt_linha * len(linhas) <= altura_max:
+        if len(linhas) <= 3 and alt_linha * len(linhas) <= altura_max:
             break
-    linhas = linhas[:4]
+    linhas = linhas[:3]
     y = TEXTO_Y0 + 10
     for linha in linhas:
         lw = d.textlength(linha, font=f)

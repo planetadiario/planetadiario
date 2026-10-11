@@ -18,8 +18,9 @@ SAIDA = ROOT / "assets" / "moldes"
 
 # Medidas extraídas do molde original (1152x2048)
 LINHA_X0, LINHA_X1 = 85, 1021
-LINHA_Y0, LINHA_Y1 = 1533, 1537
-PILULA_Y0, PILULA_Y1 = 1500, 1570  # faixa um pouco menor que a original (1491–1579)
+# Posições dentro da área segura do Instagram (recorte 4:5 do feed e interface do Reel)
+LINHA_Y0, LINHA_Y1 = 1269, 1273
+PILULA_Y0, PILULA_Y1 = 1236, 1306
 PILULA_RAIO = 10
 PILULA_PAD = 14
 PILULA_MIN = 0
@@ -27,6 +28,7 @@ FONTE_TAM = 44
 # logo (globo + nome) no canto superior direito, reduzida
 LOGO_CAIXA = (505, 110, 1045, 290)
 LOGO_ESCALA = 0.78
+LOGO_TOPO = 330
 
 FONTES = [
     "C:/Windows/Fonts/ariblk.ttf",
@@ -48,7 +50,7 @@ def gerar(label: str, cor: str, fonte) -> Image.Image:
     logo = im.crop(LOGO_CAIXA)
     nova = logo.resize((round(logo.width * LOGO_ESCALA), round(logo.height * LOGO_ESCALA)), Image.LANCZOS)
     im.paste((0, 0, 0, 0), LOGO_CAIXA)
-    im.alpha_composite(nova, (LOGO_CAIXA[2] - nova.width, LOGO_CAIXA[1]))
+    im.alpha_composite(nova, (LOGO_CAIXA[2] - nova.width, LOGO_TOPO))
     d = ImageDraw.Draw(im)
     # apaga a faixa original
     d.rectangle([0, 1484, im.width, 1586], fill=(0, 0, 0, 0))  # faixa original inteira

@@ -90,6 +90,12 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
   return m;
 }
 
+/** Apaga um post do Instagram */
+export async function apagarInstagram(env: Bindings, igMediaId: string) {
+  const r = await fetch(`https://graph.facebook.com/${env.FB_GRAPH_VERSION}/${igMediaId}?access_token=${env.FB_PAGE_TOKEN}`, { method: "DELETE" });
+  return fbJson(r);
+}
+
 /** Consulta o processamento do Reel no Facebook */
 export async function statusReel(env: Bindings, videoId: string) {
   const r = await fetch(

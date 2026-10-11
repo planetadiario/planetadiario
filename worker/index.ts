@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Bindings } from "./env";
 import { atualizarMetricas, coletar, supa } from "./coleta";
 import { buscarVideos } from "./coletores";
-import { publicarReel, publicarReelInstagram } from "./facebook";
+import { apagarInstagram, publicarReel, publicarReelInstagram } from "./facebook";
 import { dispararRender } from "./github";
 import { paginaNoticia, site } from "./site";
 
@@ -20,6 +20,16 @@ app.onError((e, c) => {
 app.post("/interno/publicar/:id", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
   return c.json(await publicar(c.env, c.req.param("id")));
+});
+
+app.post("/interno/apagar-instagram/:id", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  const db = supa(c.env);
+  const { data: reel } = await db.from("reels").select("ig_media_id").eq("id", c.req.param("id")).single();
+  if (!reel?.ig_media_id) return c.json({ erro: "sem post no Instagram" }, 404);
+  const r = await apagarInstagram(c.env, reel.ig_media_id);
+  await db.from("reels").update({ ig_media_id: null, ig_post_url: null }).eq("id", c.req.param("id"));
+  return c.json({ ok: true, r });
 });
 
 // Site público (leitores)
