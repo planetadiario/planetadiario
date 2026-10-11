@@ -1,0 +1,10 @@
+project_id = "ilnmrhgnaojgykkresfi"
+
+[auth]
+site_url = "https://planetadiario.online"
+additional_redirect_urls = [
+  "https://planetadiario.online/**",
+  "https://www.planetadiario.online/**",
+  "https://planetadiario.planetadiario.workers.dev/**",
+  "http://localhost:5173/**",
+]

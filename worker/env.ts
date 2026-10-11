@@ -3,7 +3,8 @@ export interface Bindings {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   ANTHROPIC_API_KEY: string;
-  CLAUDE_MODEL: string;
+  IA_MODELO: string;
+  NVIDIA_API_KEY: string;
   GITHUB_TOKEN: string;
   GITHUB_REPO: string;
   FB_PAGE_ID: string;

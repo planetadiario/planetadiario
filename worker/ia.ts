@@ -51,8 +51,6 @@ export interface Analise {
 /** Classifica e pontua um lote de tendências com o Claude */
 export async function analisarTendencias(env: Bindings, lote: Tendencia[]): Promise<Analise[]> {
   if (!lote.length) return [];
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-
   const entrada = lote.map((t) => ({
     id: t.id,
     fonte: t.fonte,
@@ -65,8 +63,14 @@ export async function analisarTendencias(env: Bindings, lote: Tendencia[]): Prom
     duracao_seg: t.extra?.duracao,
   }));
 
+  if (!env.IA_MODELO.startsWith("claude")) {
+    const { itens } = await nvidiaJson<{ itens: Analise[] }>(env, SISTEMA, JSON.stringify(entrada), ESQUEMA);
+    return normalizar(itens);
+  }
+
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
   const resposta = await client.beta.messages.create({
-    model: env.CLAUDE_MODEL,
+    model: env.IA_MODELO,
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
@@ -79,5 +83,36 @@ export async function analisarTendencias(env: Bindings, lote: Tendencia[]): Prom
   const texto = resposta.content.find((b) => b.type === "text");
   if (!texto || texto.type !== "text") throw new Error("Resposta do Claude sem texto");
   const { itens } = JSON.parse(texto.text) as { itens: Analise[] };
-  return itens.map((i) => ({ ...i, score: Math.max(0, Math.min(100, Math.round(i.score))) }));
+  return normalizar(itens);
+}
+
+function normalizar(itens: Analise[]): Analise[] {
+  return itens
+    .filter((i) => (CATEGORIAS as readonly string[]).includes(i.categoria))
+    .map((i) => ({ ...i, score: Math.max(0, Math.min(100, Math.round(Number(i.score) || 0))) }));
+}
+
+/** Modelos abertos via NVIDIA (API compatível com OpenAI) */
+async function nvidiaJson<T>(env: Bindings, sistema: string, usuario: string, esquema: object): Promise<T> {
+  const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: env.IA_MODELO,
+      max_tokens: 16000,
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: `${sistema}
+
+Responda APENAS com JSON válido neste esquema:
+${JSON.stringify(esquema)}` },
+        { role: "user", content: usuario },
+      ],
+    }),
+  });
+  if (!r.ok) throw new Error(`NVIDIA: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  const d = (await r.json()) as { choices: { message: { content: string } }[] };
+  const json = d.choices[0]?.message.content?.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) throw new Error("NVIDIA: resposta sem JSON");
+  return JSON.parse(json) as T;
 }
