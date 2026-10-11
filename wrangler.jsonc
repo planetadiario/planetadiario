@@ -15,6 +15,7 @@
   // Coleta de tendências a cada 10 minutos
   "triggers": { "crons": ["*/10 * * * *"] },
   "observability": { "enabled": true },
+  "workers_dev": true,
   "vars": {
     "SUPABASE_URL": "https://ilnmrhgnaojgykkresfi.supabase.co",
     "GITHUB_REPO": "planetadiario/planetadiario",
