@@ -9,6 +9,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -70,8 +71,16 @@ def baixar(url: str, pasta: Path) -> tuple[Path, dict]:
         arq = pasta / "cookies.txt"
         arq.write_text(cookies, encoding="utf-8")
         opcoes["cookiefile"] = str(arq)
-    with yt_dlp.YoutubeDL(opcoes) as ydl:
-        info = ydl.extract_info(url, download=True)
+    # sites como o Dailymotion às vezes falham de forma passageira: tenta 3 vezes
+    for tentativa in range(3):
+        try:
+            with yt_dlp.YoutubeDL(opcoes) as ydl:
+                info = ydl.extract_info(url, download=True)
+            break
+        except yt_dlp.utils.DownloadError:
+            if tentativa == 2:
+                raise
+            time.sleep(10 * (tentativa + 1))
     arquivo = next(p for p in pasta.iterdir() if p.name.startswith("origem.") and p.suffix != ".part")
     meta = {
         "titulo": info.get("title"),
