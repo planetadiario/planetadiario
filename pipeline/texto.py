@@ -28,16 +28,18 @@ Você vai gerar:
    - linha final: "📌 Siga a Planeta Diário para acompanhar tudo que acontece no mundo."
    - se houver autor/canal original, inclua "🎥 Créditos: <autor>".
    Não coloque hashtags dentro da legenda.
-3. hashtags: de 5 a 8, sem o símbolo #, sem espaços, misturando termos amplos e específicos do assunto, e sempre incluindo "planetadiario"."""
+3. artigo: texto da notícia para o site, com 2 a 4 parágrafos curtos (separados por linha em branco), em tom jornalístico, explicando o que aconteceu com os fatos disponíveis. Sem título, sem emoji, sem hashtag, sem inventar.
+4. hashtags: de 5 a 8, sem o símbolo #, sem espaços, misturando termos amplos e específicos do assunto, e sempre incluindo "planetadiario"."""
 
 ESQUEMA = {
     "type": "object",
     "properties": {
         "manchete": {"type": "string"},
         "legenda": {"type": "string"},
+        "artigo": {"type": "string"},
         "hashtags": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["manchete", "legenda", "hashtags"],
+    "required": ["manchete", "legenda", "artigo", "hashtags"],
     "additionalProperties": False,
 }
 

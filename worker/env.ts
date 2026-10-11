@@ -12,6 +12,9 @@ export interface Bindings {
   FB_GRAPH_VERSION: string;
   YOUTUBE_API_KEY?: string;
   INTERNAL_SECRET: string;
+  LYTEX_CLIENT_ID: string;
+  LYTEX_CLIENT_SECRET: string;
+  LYTEX_CALLBACK_SECRET?: string;
 }
 
 export interface Tendencia {

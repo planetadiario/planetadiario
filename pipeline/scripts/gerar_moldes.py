@@ -19,11 +19,14 @@ SAIDA = ROOT / "assets" / "moldes"
 # Medidas extraídas do molde original (1152x2048)
 LINHA_X0, LINHA_X1 = 85, 1021
 LINHA_Y0, LINHA_Y1 = 1533, 1537
-PILULA_Y0, PILULA_Y1 = 1491, 1579
-PILULA_RAIO = 12
+PILULA_Y0, PILULA_Y1 = 1500, 1570  # faixa um pouco menor que a original (1491–1579)
+PILULA_RAIO = 10
 PILULA_PAD = 14
-PILULA_MIN = 320
-FONTE_TAM = 54
+PILULA_MIN = 0
+FONTE_TAM = 44
+# logo (globo + nome) no canto superior direito, reduzida
+LOGO_CAIXA = (505, 110, 1045, 290)
+LOGO_ESCALA = 0.78
 
 FONTES = [
     "C:/Windows/Fonts/ariblk.ttf",
@@ -41,9 +44,14 @@ def carregar_fonte():
 
 def gerar(label: str, cor: str, fonte) -> Image.Image:
     im = Image.open(ORIGINAL).convert("RGBA")
+    # reduz a logo mantendo o canto superior direito no lugar
+    logo = im.crop(LOGO_CAIXA)
+    nova = logo.resize((round(logo.width * LOGO_ESCALA), round(logo.height * LOGO_ESCALA)), Image.LANCZOS)
+    im.paste((0, 0, 0, 0), LOGO_CAIXA)
+    im.alpha_composite(nova, (LOGO_CAIXA[2] - nova.width, LOGO_CAIXA[1]))
     d = ImageDraw.Draw(im)
     # apaga a faixa original
-    d.rectangle([0, PILULA_Y0 - 6, im.width, PILULA_Y1 + 6], fill=(0, 0, 0, 0))
+    d.rectangle([0, 1484, im.width, 1586], fill=(0, 0, 0, 0))  # faixa original inteira
 
     tx0, ty0, tx1, ty1 = d.textbbox((0, 0), label, font=fonte)
     tw, th = tx1 - tx0, ty1 - ty0
@@ -53,7 +61,7 @@ def gerar(label: str, cor: str, fonte) -> Image.Image:
 
     d.rectangle([LINHA_X0, LINHA_Y0, LINHA_X1, LINHA_Y1], fill=cor)
     d.rounded_rectangle([px0, PILULA_Y0, px1, PILULA_Y1], radius=PILULA_RAIO, fill=cor)
-    cy = (PILULA_Y0 + PILULA_Y1) // 2 - 6
+    cy = (PILULA_Y0 + PILULA_Y1) // 2 - 5
     d.text((cx - tw // 2 - tx0, cy - th // 2 - ty0), label, font=fonte, fill="white")
     return im
 

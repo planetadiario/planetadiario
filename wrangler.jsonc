@@ -5,8 +5,9 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/n/*"]
   },
   "routes": [
     // rotas sobre os registros DNS já existentes (proxied) da zona
@@ -26,5 +27,5 @@
     "IA_MODELO": "moonshotai/kimi-k3"
   }
   // Segredos (wrangler secret put): SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY,
-  // NVIDIA_API_KEY, GITHUB_TOKEN, FB_PAGE_ID, FB_PAGE_TOKEN, YOUTUBE_API_KEY, INTERNAL_SECRET
+  // LYTEX_CLIENT_ID, LYTEX_CLIENT_SECRET, LYTEX_CALLBACK_SECRET, NVIDIA_API_KEY, GITHUB_TOKEN, FB_PAGE_ID, FB_PAGE_TOKEN, YOUTUBE_API_KEY, INTERNAL_SECRET
 }

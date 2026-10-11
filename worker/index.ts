@@ -4,6 +4,7 @@ import { atualizarMetricas, coletar, supa } from "./coleta";
 import { buscarVideos } from "./coletores";
 import { publicarReel, publicarReelInstagram } from "./facebook";
 import { dispararRender } from "./github";
+import { paginaNoticia, site } from "./site";
 
 const CRON_METRICAS = "5 * * * *";
 
@@ -20,6 +21,9 @@ app.post("/interno/publicar/:id", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
   return c.json(await publicar(c.env, c.req.param("id")));
 });
+
+// Site público (leitores)
+app.route("/site", site);
 
 // Daqui pra baixo: só administradores logados no painel
 app.use("*", async (c, next) => {
@@ -121,12 +125,39 @@ async function publicar(env: Bindings, id: string) {
       await db.from("reels").update({ erro: `Instagram: ${e instanceof Error ? e.message : e}` }).eq("id", id);
     }
   }
+  // Site: assinantes veem na hora; o público, depois do acesso antecipado
+  if (!reel.site_publicado_em) {
+    const { data: cfg } = await db.from("config").select("valor").eq("chave", "acesso_antecipado_min").maybeSingle();
+    const agora = Date.now();
+    await db
+      .from("reels")
+      .update({
+        slug: reel.slug ?? slugify(reel.manchete ?? reel.origem_titulo ?? "noticia", id),
+        site_publicado_em: new Date(agora).toISOString(),
+        liberado_em: new Date(agora + Number(cfg?.valor ?? 30) * 60_000).toISOString(),
+      })
+      .eq("id", id);
+  }
   await db.from("reels").update({ status: "publicado" }).eq("id", id);
   return { ok: true, url: fbUrl, instagram: igUrl };
 }
 
+function slugify(texto: string, id: string) {
+  const base = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  return `${base}-${id.slice(0, 6)}`;
+}
+
 export default {
-  fetch: app.fetch,
+  fetch(req, env, ctx) {
+    if (new URL(req.url).pathname.startsWith("/n/")) return paginaNoticia(req, env);
+    return app.fetch(req, env, ctx);
+  },
   async scheduled(ctrl, env, ctx) {
     if (ctrl.cron === CRON_METRICAS) ctx.waitUntil(atualizarMetricas(env));
     else ctx.waitUntil(coletar(env).then(() => undefined));

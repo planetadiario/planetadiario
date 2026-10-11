@@ -151,6 +151,7 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             "status": "pronto",
             "manchete": textos["manchete"],
             "legenda": textos["legenda"],
+            "artigo": textos.get("artigo"),
             "hashtags": textos["hashtags"],
             "video_path": f"{BUCKET}/{reel_id}.mp4",
             "video_url": url_video,
