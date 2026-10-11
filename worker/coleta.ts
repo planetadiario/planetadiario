@@ -85,13 +85,16 @@ async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[
     .from("tendencias")
     .select("*")
     .eq("analisado", false)
+    .gte("detectado_em", new Date(Date.now() - 6 * 3600_000).toISOString())
     .order("detectado_em", { ascending: false })
-    .limit(40);
+    .limit(80);
   if (error) return log.push(`pendentes: ${error.message}`);
   if (!pendentes?.length) return;
 
   try {
-    const analises = await analisarTendencias(env, pendentes);
+    // dois lotes em paralelo para acompanhar o volume da coleta
+    const lotes = [pendentes.slice(0, 40), pendentes.slice(40)];
+    const analises = (await Promise.all(lotes.map((l) => analisarTendencias(env, l)))).flat();
     const porId = new Map(analises.map((a) => [a.id, a]));
     const atualizados = pendentes
       .filter((t) => porId.has(t.id))
