@@ -126,7 +126,7 @@ async function publicar(env: Bindings, id: string) {
   let igUrl: string | null = reel.ig_post_url;
   if (!reel.ig_media_id) {
     try {
-      const ig = await publicarReelInstagram(env, reel.video_url, descricao);
+      const ig = await publicarReelInstagram(env, reel.video_ig_url ?? reel.video_url, descricao);
       if (ig) {
         igUrl = ig.url;
         await db.from("reels").update({ ig_media_id: ig.mediaId, ig_post_url: ig.url }).eq("id", id);

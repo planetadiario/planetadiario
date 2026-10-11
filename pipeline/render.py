@@ -14,14 +14,13 @@ MOLDES = RAIZ / "assets" / "moldes"
 FONTE = RAIZ / "fonts" / "Montserrat.ttf"
 
 W, H = 1080, 1920
-# Tudo dentro da área segura do Instagram: o feed recorta 4:5 (y 285–1635) e a
-# interface do Reel cobre a base; por isso texto termina em ~80% da altura.
-# vídeo horizontal: área entre a logo e a faixa da categoria (molde escalado p/ 1080x1920)
-CAIXA_Y0, CAIXA_Y1 = 450, 1150
-# manchete: abaixo da faixa da categoria
-TEXTO_Y0, TEXTO_Y1 = 1236, 1545
-TEXTO_MARGEM = 70
-DEGRADE_Y0 = 900
+# Medidas no vídeo 1080x1920 para cada rede (os moldes de cada uma seguem as mesmas posições)
+LAYOUTS = {
+    # layout original: logo no topo, faixa e manchete embaixo
+    "facebook": {"caixa": (255, 1390), "texto": (1500, 1800), "margem": 60, "degrade": 1180, "linhas": 4, "fonte": (72, 42)},
+    # área segura do Instagram: o feed recorta 4:5 (y 285–1635) e a interface do Reel cobre a base
+    "instagram": {"caixa": (450, 1150), "texto": (1236, 1545), "margem": 70, "degrade": 900, "linhas": 3, "fonte": (64, 38)},
+}
 COR_RODAPE = (255, 40, 40, 255)
 DURACAO_MAX = 90
 
@@ -46,8 +45,9 @@ def quebrar(texto: str, f: ImageFont.FreeTypeFont, largura: int, d: ImageDraw.Im
     return linhas
 
 
-def camada(molde: Path, manchete: str, rodape: str, destino: Path) -> Path:
+def camada(molde: Path, manchete: str, rodape: str, destino: Path, layout: dict) -> Path:
     """Degradê + molde + manchete + rodapé numa imagem transparente 1080x1920."""
+    DEGRADE_Y0, (TEXTO_Y0, TEXTO_Y1), TEXTO_MARGEM = layout["degrade"], layout["texto"], layout["margem"]
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 
     # degradê para leitura do texto
@@ -66,13 +66,14 @@ def camada(molde: Path, manchete: str, rodape: str, destino: Path) -> Path:
     f_rod = fonte(34, "SemiBold")
     alt_rod = 34 + 26 if rodape else 0
     altura_max = TEXTO_Y1 - TEXTO_Y0 - alt_rod
-    for tam in range(64, 38, -2):
+    maior, menor = layout["fonte"]
+    for tam in range(maior, menor, -2):
         f = fonte(tam, "Bold")
         linhas = quebrar(manchete, f, largura, d)
         alt_linha = int(tam * 1.18)
-        if len(linhas) <= 3 and alt_linha * len(linhas) <= altura_max:
+        if len(linhas) <= layout["linhas"] and alt_linha * len(linhas) <= altura_max:
             break
-    linhas = linhas[:3]
+    linhas = linhas[: layout["linhas"]]
     y = TEXTO_Y0 + 10
     for linha in linhas:
         lw = d.textlength(linha, font=f)
@@ -105,13 +106,15 @@ def sondar(video: Path) -> dict:
 
 
 def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
-           inicio: float | None = None, fim: float | None = None) -> dict:
+           inicio: float | None = None, fim: float | None = None, rede: str = "facebook") -> dict:
+    layout = LAYOUTS[rede]
+    CAIXA_Y0, CAIXA_Y1 = layout["caixa"]
     info = sondar(video)
     inicio = inicio or 0.0
     fim = min(fim or info["duracao"], inicio + DURACAO_MAX)
     duracao = max(3.0, fim - inicio)
 
-    overlay = camada(molde, manchete, rodape, saida.with_suffix(".overlay.png"))
+    overlay = camada(molde, manchete, rodape, saida.with_suffix(".overlay.png"), layout)
     if info["vertical"]:
         base = f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}[v1];"
     else:
@@ -144,6 +147,7 @@ def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
     return {"duracao": round(duracao, 2), "capa": capa}
 
 
-def molde_padrao(categoria: str) -> Path:
-    p = MOLDES / f"{categoria}.png"
-    return p if p.exists() else MOLDES / "noticias.png"
+def molde_padrao(categoria: str, rede: str = "facebook") -> Path:
+    pasta = RAIZ / "assets" / ("moldes-ig" if rede == "instagram" else "moldes")
+    p = pasta / f"{categoria}.png"
+    return p if p.exists() else pasta / "noticias.png"

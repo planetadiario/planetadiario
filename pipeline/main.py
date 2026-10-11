@@ -95,17 +95,18 @@ def baixar(url: str, pasta: Path) -> tuple[Path, dict]:
     return arquivo, meta
 
 
-def baixar_molde(categoria: str, pasta: Path) -> Path:
-    """Molde enviado pelo painel (Storage) ou o padrão do repositório."""
-    cat = db_get("categorias", f"slug=eq.{categoria}", "molde_url")
-    url = cat[0]["molde_url"] if cat else None
+def baixar_molde(categoria: str, pasta: Path, rede: str) -> Path:
+    """Molde enviado pelo painel (Storage) ou o padrão do repositório, por rede."""
+    campo = "molde_ig_url" if rede == "instagram" else "molde_url"
+    cat = db_get("categorias", f"slug=eq.{categoria}", campo)
+    url = cat[0][campo] if cat else None
     if url:
         r = requests.get(url, timeout=60)
         if r.ok:
-            arq = pasta / "molde.png"
+            arq = pasta / f"molde-{rede}.png"
             arq.write_bytes(r.content)
             return arq
-    return molde_padrao(categoria)
+    return molde_padrao(categoria, rede)
 
 
 # ---------- Processo ----------
@@ -137,16 +138,20 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
         print("✍️  escrevendo textos")
         textos = gerar_textos(contexto)
 
-        print("🎬 montando vídeo")
-        molde = baixar_molde(reel["categoria"], pasta)
         cfg = db_get("config", "chave=eq.rodape", "valor")
         rodape = cfg[0]["valor"] if cfg else ""
+        corte = (reel.get("corte_inicio"), reel.get("corte_fim"))
+
+        print("🎬 montando versão Facebook/site")
         saida = pasta / "reel.mp4"
-        res = montar(video, molde, textos["manchete"], rodape, saida,
-                     reel.get("corte_inicio"), reel.get("corte_fim"))
+        res = montar(video, baixar_molde(reel["categoria"], pasta, "facebook"), textos["manchete"], rodape, saida, *corte, rede="facebook")
+        print("🎬 montando versão Instagram")
+        saida_ig = pasta / "reel-ig.mp4"
+        montar(video, baixar_molde(reel["categoria"], pasta, "instagram"), textos["manchete"], rodape, saida_ig, *corte, rede="instagram")
 
         print("☁️  enviando")
         url_video = enviar_arquivo(f"{reel_id}.mp4", saida, "video/mp4")
+        url_video_ig = enviar_arquivo(f"{reel_id}-ig.mp4", saida_ig, "video/mp4")
         url_capa = enviar_arquivo(f"{reel_id}.jpg", res["capa"], "image/jpeg")
 
         db_patch("reels", f"id=eq.{reel_id}", {
@@ -157,6 +162,7 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             "hashtags": textos["hashtags"],
             "video_path": f"{BUCKET}/{reel_id}.mp4",
             "video_url": url_video,
+            "video_ig_url": url_video_ig,
             "thumb_url": url_capa,
             "duracao": res["duracao"],
             "origem_autor": contexto["autor"],
@@ -187,9 +193,9 @@ def limpar(dias: int = 7) -> None:
     limite = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
     velhos = db_get("reels", f"status=in.(publicado,rejeitado,erro)&atualizado_em=lt.{limite}&video_path=not.is.null", "id")
     for r in velhos:
-        nomes = [f"{r['id']}.mp4", f"{r['id']}.jpg"]
+        nomes = [f"{r['id']}.mp4", f"{r['id']}-ig.mp4", f"{r['id']}.jpg"]
         requests.delete(f"{SUPABASE_URL}/storage/v1/object/{BUCKET}", headers=HDR, json={"prefixes": nomes}, timeout=30)
-        db_patch("reels", f"id=eq.{r['id']}", {"video_path": None, "video_url": None, "thumb_url": None})
+        db_patch("reels", f"id=eq.{r['id']}", {"video_path": None, "video_url": None, "video_ig_url": None, "thumb_url": None})
     print(f"🧹 {len(velhos)} vídeos removidos")
 
 

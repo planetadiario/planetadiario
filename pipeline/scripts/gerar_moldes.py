@@ -14,13 +14,17 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 ORIGINAL = ROOT / "assets" / "molde-original.png"
-SAIDA = ROOT / "assets" / "moldes"
 
 # Medidas extraídas do molde original (1152x2048)
 LINHA_X0, LINHA_X1 = 85, 1021
-# Posições dentro da área segura do Instagram (recorte 4:5 do feed e interface do Reel)
-LINHA_Y0, LINHA_Y1 = 1269, 1273
-PILULA_Y0, PILULA_Y1 = 1236, 1306
+
+# Duas versões de cada molde:
+# - facebook: layout original (logo no topo, faixa embaixo)
+# - instagram: tudo dentro da área segura (recorte 4:5 do feed e interface do Reel)
+LAYOUTS = {
+    "facebook": {"pasta": "moldes", "logo_topo": 110, "pilula": (1500, 1570), "linha": (1533, 1537)},
+    "instagram": {"pasta": "moldes-ig", "logo_topo": 330, "pilula": (1236, 1306), "linha": (1269, 1273)},
+}
 PILULA_RAIO = 10
 PILULA_PAD = 14
 PILULA_MIN = 0
@@ -28,7 +32,6 @@ FONTE_TAM = 44
 # logo (globo + nome) no canto superior direito, reduzida
 LOGO_CAIXA = (505, 110, 1045, 290)
 LOGO_ESCALA = 0.78
-LOGO_TOPO = 330
 
 FONTES = [
     "C:/Windows/Fonts/ariblk.ttf",
@@ -44,13 +47,14 @@ def carregar_fonte():
     sys.exit("Nenhuma fonte bold encontrada")
 
 
-def gerar(label: str, cor: str, fonte) -> Image.Image:
+def gerar(label: str, cor: str, fonte, layout: dict) -> Image.Image:
+    (PILULA_Y0, PILULA_Y1), (LINHA_Y0, LINHA_Y1) = layout["pilula"], layout["linha"]
     im = Image.open(ORIGINAL).convert("RGBA")
     # reduz a logo mantendo o canto superior direito no lugar
     logo = im.crop(LOGO_CAIXA)
     nova = logo.resize((round(logo.width * LOGO_ESCALA), round(logo.height * LOGO_ESCALA)), Image.LANCZOS)
     im.paste((0, 0, 0, 0), LOGO_CAIXA)
-    im.alpha_composite(nova, (LOGO_CAIXA[2] - nova.width, LOGO_TOPO))
+    im.alpha_composite(nova, (LOGO_CAIXA[2] - nova.width, layout["logo_topo"]))
     d = ImageDraw.Draw(im)
     # apaga a faixa original
     d.rectangle([0, 1484, im.width, 1586], fill=(0, 0, 0, 0))  # faixa original inteira
@@ -69,12 +73,14 @@ def gerar(label: str, cor: str, fonte) -> Image.Image:
 
 
 def main():
-    SAIDA.mkdir(parents=True, exist_ok=True)
     fonte = carregar_fonte()
     cats = json.loads((ROOT / "categorias.json").read_text(encoding="utf-8"))
-    for c in cats:
-        gerar(c["label"], c["cor"], fonte).save(SAIDA / f"{c['slug']}.png", optimize=True)
-        print("ok", c["slug"])
+    for nome, layout in LAYOUTS.items():
+        saida = ROOT / "assets" / layout["pasta"]
+        saida.mkdir(parents=True, exist_ok=True)
+        for c in cats:
+            gerar(c["label"], c["cor"], fonte, layout).save(saida / f"{c['slug']}.png", optimize=True)
+        print("ok", nome, len(cats))
 
 
 if __name__ == "__main__":
