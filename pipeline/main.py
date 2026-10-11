@@ -66,6 +66,8 @@ def baixar(url: str, pasta: Path) -> tuple[Path, dict]:
         "no_warnings": True,
         "retries": 3,
     }
+    if os.environ.get("YTDLP_PROXY"):
+        opcoes["proxy"] = os.environ["YTDLP_PROXY"]  # WARP: evita bloqueio de IP de servidor
     cookies = os.environ.get("YTDLP_COOKIES")
     if cookies:
         arq = pasta / "cookies.txt"
