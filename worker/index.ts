@@ -87,9 +87,7 @@ async function publicar(env: Bindings, id: string) {
 
   await db.from("reels").update({ status: "publicando", erro: null }).eq("id", id);
   const tags = (reel.hashtags as string[]).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
-  const descricao = [reel.legenda, tags].filter(Boolean).join("
-
-");
+  const descricao = [reel.legenda, tags].filter(Boolean).join("\n\n");
 
   // Facebook (obrigatório)
   let fbUrl: string | null = reel.fb_post_url;
