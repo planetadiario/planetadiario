@@ -16,7 +16,7 @@ from pathlib import Path
 import requests
 import yt_dlp
 
-from render import montar
+from render import molde_padrao, montar
 from texto import gerar_textos
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
@@ -84,6 +84,19 @@ def baixar(url: str, pasta: Path) -> tuple[Path, dict]:
     return arquivo, meta
 
 
+def baixar_molde(categoria: str, pasta: Path) -> Path:
+    """Molde enviado pelo painel (Storage) ou o padrão do repositório."""
+    cat = db_get("categorias", f"slug=eq.{categoria}", "molde_url")
+    url = cat[0]["molde_url"] if cat else None
+    if url:
+        r = requests.get(url, timeout=60)
+        if r.ok:
+            arq = pasta / "molde.png"
+            arq.write_bytes(r.content)
+            return arq
+    return molde_padrao(categoria)
+
+
 # ---------- Processo ----------
 
 def processar(reel_id: str, auto_publicar: bool) -> None:
@@ -114,8 +127,11 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
         textos = gerar_textos(contexto)
 
         print("🎬 montando vídeo")
+        molde = baixar_molde(reel["categoria"], pasta)
+        cfg = db_get("config", "chave=eq.rodape", "valor")
+        rodape = cfg[0]["valor"] if cfg else ""
         saida = pasta / "reel.mp4"
-        res = montar(video, reel["categoria"], textos["manchete"], saida,
+        res = montar(video, molde, textos["manchete"], rodape, saida,
                      reel.get("corte_inicio"), reel.get("corte_fim"))
 
         print("☁️  enviando")

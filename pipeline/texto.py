@@ -16,7 +16,11 @@ Regras de veracidade (muito importante):
 - Nunca afirme algo não confirmado como fato; use "segundo relatos", "de acordo com" quando couber.
 
 Você vai gerar:
-1. manchete: texto que vai GRAVADO no vídeo, abaixo da faixa da categoria. Máximo 60 caracteres, em MAIÚSCULAS, sem emoji, sem hashtag. Precisa prender nos 2 primeiros segundos (curiosidade ou impacto), sem ser enganosa.
+1. manchete: a frase que vai GRAVADA no vídeo, logo abaixo da faixa da categoria. É a notícia em uma frase, no estilo de portal de notícias:
+   - frase normal (só a primeira letra e nomes próprios em maiúscula), sem emoji, sem hashtag, sem ponto final;
+   - entre 60 e 100 caracteres, com o essencial: quem, o quê, onde e quando (se souber);
+   - chamativa e com tensão, para o leitor parar de rolar, mas 100% fiel aos fatos;
+   - exemplo do padrão: "Homem morre após entrar em jaula de tigre em zoológico no Reino Unido neste sábado".
 2. legenda: descrição do post no Facebook, com:
    - 1ª linha: gancho forte com 1 emoji (aparece antes do "ver mais", até ~100 caracteres);
    - 2 a 3 frases curtas de contexto;
@@ -63,7 +67,7 @@ def gerar_textos(contexto: dict) -> dict:
     modelo = os.environ.get("IA_MODELO", "moonshotai/kimi-k3")
     usuario = "Informações sobre o vídeo:\n" + json.dumps(contexto, ensure_ascii=False, indent=2)
     dados = _claude(modelo, usuario) if modelo.startswith("claude") else _nvidia(modelo, usuario)
-    dados["manchete"] = dados["manchete"].strip().upper()[:70]
+    dados["manchete"] = dados["manchete"].strip().rstrip(".")[:120]
     dados["hashtags"] = [h.lstrip("#").replace(" ", "") for h in dados["hashtags"] if h.strip()][:8]
     if "planetadiario" not in [h.lower() for h in dados["hashtags"]]:
         dados["hashtags"].append("planetadiario")

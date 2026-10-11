@@ -67,6 +67,29 @@ export async function publicarReelInstagram(env: Bindings, videoUrl: string, leg
   return { mediaId: pub.id, url: link.permalink ?? null };
 }
 
+/** Curtidas e comentários do Reel no Facebook e no Instagram */
+export async function metricasReel(env: Bindings, fbVideoId: string | null, igMediaId: string | null) {
+  const g = `https://graph.facebook.com/${env.FB_GRAPH_VERSION}`;
+  const t = env.FB_PAGE_TOKEN;
+  const m = { fb_curtidas: 0, fb_comentarios: 0, ig_curtidas: 0, ig_comentarios: 0 };
+  if (fbVideoId) {
+    const r = (await fbJson(
+      await fetch(`${g}/${fbVideoId}?fields=likes.summary(true).limit(0),comments.summary(true).limit(0)&access_token=${t}`),
+    )) as { likes?: { summary?: { total_count: number } }; comments?: { summary?: { total_count: number } } };
+    m.fb_curtidas = r.likes?.summary?.total_count ?? 0;
+    m.fb_comentarios = r.comments?.summary?.total_count ?? 0;
+  }
+  if (igMediaId) {
+    const r = (await fbJson(await fetch(`${g}/${igMediaId}?fields=like_count,comments_count&access_token=${t}`))) as {
+      like_count?: number;
+      comments_count?: number;
+    };
+    m.ig_curtidas = r.like_count ?? 0;
+    m.ig_comentarios = r.comments_count ?? 0;
+  }
+  return m;
+}
+
 /** Consulta o processamento do Reel no Facebook */
 export async function statusReel(env: Bindings, videoId: string) {
   const r = await fetch(

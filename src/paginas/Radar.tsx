@@ -81,7 +81,7 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
     <div>
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Radar de tendências</h1>
+          <h2 className="text-base font-semibold">Radar de tendências</h2>
           <p className="text-sm text-suave">O que está bombando agora no mundo, pontuado pela IA</p>
         </div>
         <button
@@ -130,7 +130,7 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {itens.map((t) => (
-            <article key={t.id} className="flex flex-col overflow-hidden rounded-xl border border-borda bg-painel">
+            <article key={t.id} className="flex flex-col overflow-hidden cartao">
               {t.imagem && (
                 <div className="relative aspect-video bg-black">
                   <img src={t.imagem} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -191,7 +191,7 @@ function Filtro({ ativo, onClick, children }: { ativo: boolean; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1 ${ativo ? "border-marca bg-marca/15 text-white" : "border-borda text-suave hover:text-white"}`}
+      className={`shrink-0 rounded-full border px-3 py-1 ${ativo ? "border-marca bg-marca/10 text-marca font-medium" : "border-borda text-suave hover:text-texto"}`}
     >
       {children}
     </button>

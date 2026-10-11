@@ -21,6 +21,12 @@ const FILTROS = {
 export default function Producao() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [filtro, setFiltro] = useState<keyof typeof FILTROS>("ativos");
+  const [cat, setCat] = useState("");
+  const [categorias, setCategorias] = useState<{ slug: string; label: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from("categorias").select("slug, label").eq("ativa", true).order("ordem").then(({ data }) => setCategorias(data ?? []));
+  }, []);
 
   useEffect(() => {
     let ativo = true;
@@ -29,6 +35,7 @@ export default function Producao() {
         .from("reels")
         .select("*")
         .in("status", [...FILTROS[filtro]])
+        .match(cat ? { categoria: cat } : {})
         .order("criado_em", { ascending: false })
         .limit(60)
         .then(({ data }) => ativo && setReels((data as Reel[]) ?? []));
@@ -41,20 +48,31 @@ export default function Producao() {
       ativo = false;
       supabase.removeChannel(canal);
     };
-  }, [filtro]);
+  }, [filtro, cat]);
 
   return (
     <div>
       <header className="mb-4">
-        <h1 className="text-xl font-bold">Produção</h1>
+        <h2 className="text-base font-semibold">Produção</h2>
         <p className="text-sm text-suave">Revise, ajuste a legenda e publique. Atualiza sozinho.</p>
       </header>
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1 text-sm">
+        {[{ slug: "", label: "Todas" }, ...categorias].map((c) => (
+          <button
+            key={c.slug}
+            onClick={() => setCat(c.slug)}
+            className={`shrink-0 rounded-full border px-3 py-1 text-xs ${cat === c.slug ? "border-marca bg-marca/10 font-medium text-marca" : "border-borda text-suave hover:text-texto"}`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
       <div className="mb-5 flex gap-2 text-sm">
         {(Object.keys(FILTROS) as (keyof typeof FILTROS)[]).map((f) => (
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`rounded-full border px-3 py-1 capitalize ${filtro === f ? "border-marca bg-marca/15" : "border-borda text-suave"}`}
+            className={`rounded-full border px-3 py-1 capitalize ${filtro === f ? "border-texto/40 bg-painel font-medium" : "border-borda text-suave"}`}
           >
             {f}
           </button>
@@ -108,7 +126,7 @@ function CartaoReel({ reel }: { reel: Reel }) {
       });
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-xl border border-borda bg-painel">
+    <article className="flex flex-col overflow-hidden cartao">
       <div className="relative mx-auto aspect-[9/16] w-full max-w-[280px] bg-black">
         {reel.video_url ? (
           <video src={reel.video_url} poster={reel.thumb_url ?? undefined} controls playsInline preload="none" className="h-full w-full" />
@@ -180,7 +198,7 @@ function CartaoReel({ reel }: { reel: Reel }) {
             <button
               disabled={ocupado}
               onClick={() => acao(() => supabase.from("reels").update({ status: "rejeitado" }).eq("id", reel.id).then())}
-              className="rounded-lg px-3 py-1.5 text-suave hover:text-white"
+              className="rounded-lg px-3 py-1.5 text-suave hover:text-texto"
             >
               Rejeitar
             </button>

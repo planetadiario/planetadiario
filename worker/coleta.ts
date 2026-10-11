@@ -3,6 +3,7 @@ import type { Bindings, Tendencia } from "./env";
 import { buscarVideos, dailymotion, googleTrends, youtubeEmAlta } from "./coletores";
 import { analisarTendencias } from "./ia";
 import { dispararRender } from "./github";
+import { metricasReel } from "./facebook";
 
 export function supa(env: Bindings) {
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -173,5 +174,26 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     if (error) return log.push(`piloto: ${error.message}`);
     await dispararRender(env, reel.id, true);
     return log.push(`piloto: reel ${reel.id} (${t.titulo_pt ?? t.titulo})`);
+  }
+}
+
+/** Roda de hora em hora: atualiza curtidas/comentários dos Reels dos últimos 30 dias */
+export async function atualizarMetricas(env: Bindings) {
+  const db = supa(env);
+  const desde = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const { data } = await db
+    .from("reels")
+    .select("id, fb_video_id, ig_media_id")
+    .eq("status", "publicado")
+    .gte("publicado_em", desde)
+    .order("metricas_em", { ascending: true, nullsFirst: true })
+    .limit(20);
+  for (const r of data ?? []) {
+    try {
+      const metricas = await metricasReel(env, r.fb_video_id, r.ig_media_id);
+      await db.from("reels").update({ metricas, metricas_em: new Date().toISOString() }).eq("id", r.id);
+    } catch (e) {
+      console.log(`métricas ${r.id}: ${e instanceof Error ? e.message : e}`);
+    }
   }
 }

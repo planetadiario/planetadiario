@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import type { Bindings } from "./env";
-import { coletar, supa } from "./coleta";
+import { atualizarMetricas, coletar, supa } from "./coleta";
 import { buscarVideos } from "./coletores";
 import { publicarReel, publicarReelInstagram } from "./facebook";
 import { dispararRender } from "./github";
+
+const CRON_METRICAS = "5 * * * *";
 
 type App = { Bindings: Bindings; Variables: { email: string } };
 const app = new Hono<App>().basePath("/api");
@@ -125,7 +127,8 @@ async function publicar(env: Bindings, id: string) {
 
 export default {
   fetch: app.fetch,
-  async scheduled(_ctrl, env, ctx) {
-    ctx.waitUntil(coletar(env).then(() => undefined));
+  async scheduled(ctrl, env, ctx) {
+    if (ctrl.cron === CRON_METRICAS) ctx.waitUntil(atualizarMetricas(env));
+    else ctx.waitUntil(coletar(env).then(() => undefined));
   },
 } satisfies ExportedHandler<Bindings>;

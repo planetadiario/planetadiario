@@ -1,15 +1,51 @@
 @import "tailwindcss";
 
-@theme {
-  --color-fundo: #0b0f17;
-  --color-painel: #131a26;
-  --color-borda: #222c3d;
-  --color-texto: #e8edf5;
-  --color-suave: #8b97ab;
-  --color-marca: #ff1a1a;
-  --color-globo: #1d7fd8;
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --fundo: #f5f6fa;
+  --painel: #ffffff;
+  --painel-2: #f0f2f7;
+  --borda: #e4e7ef;
+  --texto: #161a23;
+  --suave: #6b7385;
+  --marca: #e5121b;
+  --globo: #2563eb;
+  --fb: #2563eb;
+  --ig: #db2777;
+  --sombra: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  color-scheme: light;
+}
+.dark {
+  --fundo: #0d1117;
+  --painel: #141922;
+  --painel-2: #1b2230;
+  --borda: #252d3b;
+  --texto: #e8edf5;
+  --suave: #8b97ab;
+  --marca: #ff2d36;
+  --globo: #3b82f6;
+  --fb: #3b82f6;
+  --ig: #ec4899;
+  --sombra: none;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-painel: var(--painel);
+  --color-painel-2: var(--painel-2);
+  --color-borda: var(--borda);
+  --color-texto: var(--texto);
+  --color-suave: var(--suave);
+  --color-marca: var(--marca);
+  --color-globo: var(--globo);
+  --color-fb: var(--fb);
+  --color-ig: var(--ig);
+  --shadow-cartao: var(--sombra);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
-html, body { background: var(--color-fundo); color: var(--color-texto); }
-body { -webkit-tap-highlight-color: transparent; }
+html, body { background: var(--fundo); color: var(--texto); }
+body { -webkit-tap-highlight-color: transparent; font-feature-settings: "tnum"; }
+.cartao { background: var(--painel); border: 1px solid var(--borda); border-radius: 14px; box-shadow: var(--sombra); }

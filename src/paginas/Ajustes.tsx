@@ -8,6 +8,7 @@ interface Cfg {
   max_posts_dia: number;
   paises: string[];
   fontes_bloqueadas: string[];
+  rodape: string;
 }
 
 export default function Ajustes() {
@@ -39,11 +40,11 @@ export default function Ajustes() {
   return (
     <div className="mx-auto max-w-2xl">
       <header className="mb-5 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Ajustes</h1>
+        <h2 className="text-base font-semibold">Ajustes</h2>
         <span className="text-sm text-green-400">{salvo}</span>
       </header>
 
-      <section className="mb-5 rounded-2xl border border-borda bg-painel p-5">
+      <section className="mb-5 cartao p-5">
         <h2 className="mb-1 font-semibold">Piloto automático</h2>
         <p className="mb-4 text-sm text-suave">
           Quando ligado, a cada 10 minutos o sistema pega o assunto com maior pontuação, encontra um vídeo, monta o Reel e
@@ -76,7 +77,7 @@ export default function Ajustes() {
         </label>
       </section>
 
-      <section className="mb-5 rounded-2xl border border-borda bg-painel p-5">
+      <section className="mb-5 cartao p-5">
         <h2 className="mb-1 font-semibold">Categorias</h2>
         <p className="mb-3 text-sm text-suave">Desligue as que não quer no radar. Cada uma tem sua faixa no molde.</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -93,7 +94,18 @@ export default function Ajustes() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-borda bg-painel p-5">
+      <section className="mb-5 cartao p-5">
+        <h2 className="mb-1 font-semibold">Texto do Reel</h2>
+        <p className="mb-3 text-sm text-suave">Linha vermelha que aparece abaixo da manchete em todos os vídeos.</p>
+        <input
+          defaultValue={cfg.rodape ?? ""}
+          onBlur={(e) => gravar("rodape", e.target.value.trim())}
+          placeholder="Mais notícias em planetadiario.online"
+          className="w-full rounded-lg border border-borda bg-fundo px-3 py-2 text-sm"
+        />
+      </section>
+
+      <section className="cartao p-5">
         <h2 className="mb-3 font-semibold">Fontes</h2>
         <ListaEditavel
           titulo="Países monitorados (códigos)"

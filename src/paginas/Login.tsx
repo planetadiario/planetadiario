@@ -22,11 +22,12 @@ export default function Login() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4">
-      <form onSubmit={entrar} className="w-full max-w-sm rounded-2xl border border-borda bg-painel p-6">
-        <img src="/logo.png" alt="Planeta Diário" className="mx-auto mb-6 w-48" />
+      <form onSubmit={entrar} className="w-full max-w-sm cartao p-6">
+        <img src="/logo-claro.png" alt="Planeta Diário" className="mx-auto mb-6 w-48 dark:hidden" />
+        <img src="/logo.png" alt="Planeta Diário" className="mx-auto mb-6 hidden w-48 dark:block" />
         {estado === "enviado" ? (
           <p className="text-center text-sm text-suave">
-            Enviamos um link de acesso para <b className="text-white">{email}</b>. Abra o e-mail e clique no link.
+            Enviamos um link de acesso para <b className="text-texto">{email}</b>. Abra o e-mail e clique no link.
           </p>
         ) : (
           <>

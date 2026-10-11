@@ -29,12 +29,12 @@ export default function NovoReel({ criado }: { criado: () => void }) {
 
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="text-xl font-bold">Novo Reel a partir de um link</h1>
+      <h2 className="text-base font-semibold">Novo Reel a partir de um link</h2>
       <p className="mb-5 text-sm text-suave">
         Cole o link de um vídeo (YouTube, TikTok, Instagram, X/Twitter, Kwai, Facebook, Dailymotion…). O sistema baixa,
         aplica o molde, escreve a manchete, a legenda e as hashtags.
       </p>
-      <form onSubmit={enviar} className="flex flex-col gap-4 rounded-2xl border border-borda bg-painel p-5">
+      <form onSubmit={enviar} className="flex flex-col gap-4 cartao p-5">
         <div>
           <label className="mb-1 block text-sm text-suave">Link do vídeo</label>
           <input
