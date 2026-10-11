@@ -8,3 +8,8 @@ additional_redirect_urls = [
   "https://planetadiario.planetadiario.workers.dev/**",
   "http://localhost:5173/**",
 ]
+
+[auth.external.google]
+enabled = true
+client_id = "250373277783-oi20rib14u0h4aq0u7jj8uqg5kbcqv80.apps.googleusercontent.com"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
