@@ -81,7 +81,7 @@ def _claude(modelo: str, usuario: str) -> dict:
         system=SISTEMA,
         messages=[{
             "role": "user",
-            "content": "Informações sobre o vídeo:\n" + json.dumps(contexto, ensure_ascii=False, indent=2),
+            "content": usuario,
         }],
     )
     if resposta.stop_reason == "refusal":

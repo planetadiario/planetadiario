@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Bindings } from "./env";
 import { coletar, supa } from "./coleta";
 import { buscarVideos } from "./coletores";
-import { publicarReel } from "./facebook";
+import { publicarReel, publicarReelInstagram } from "./facebook";
 import { dispararRender } from "./github";
 
 type App = { Bindings: Bindings; Variables: { email: string } };
@@ -83,23 +83,46 @@ async function publicar(env: Bindings, id: string) {
   const { data: reel, error } = await db.from("reels").select("*").eq("id", id).single();
   if (error) throw error;
   if (!reel.video_url) throw new Error("o vídeo ainda não está pronto");
-  if (reel.status === "publicado") return { ok: true, url: reel.fb_post_url };
+  if (reel.fb_video_id && reel.ig_media_id) return { ok: true, url: reel.fb_post_url };
 
   await db.from("reels").update({ status: "publicando", erro: null }).eq("id", id);
   const tags = (reel.hashtags as string[]).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
-  const descricao = [reel.legenda, tags].filter(Boolean).join("\n\n");
-  try {
-    const fb = await publicarReel(env, reel.video_url, descricao);
-    await db
-      .from("reels")
-      .update({ status: "publicado", fb_video_id: fb.videoId, fb_post_url: fb.url, publicado_em: new Date().toISOString() })
-      .eq("id", id);
-    return { ok: true, url: fb.url };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await db.from("reels").update({ status: "pronto", erro: msg }).eq("id", id);
-    throw e;
+  const descricao = [reel.legenda, tags].filter(Boolean).join("
+
+");
+
+  // Facebook (obrigatório)
+  let fbUrl: string | null = reel.fb_post_url;
+  if (!reel.fb_video_id) {
+    try {
+      const fb = await publicarReel(env, reel.video_url, descricao);
+      fbUrl = fb.url;
+      await db
+        .from("reels")
+        .update({ status: "publicado", fb_video_id: fb.videoId, fb_post_url: fb.url, publicado_em: new Date().toISOString() })
+        .eq("id", id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await db.from("reels").update({ status: "pronto", erro: msg }).eq("id", id);
+      throw e;
+    }
   }
+
+  // Instagram (se houver conta profissional vinculada à página); falha aqui não desfaz o Facebook
+  let igUrl: string | null = reel.ig_post_url;
+  if (!reel.ig_media_id) {
+    try {
+      const ig = await publicarReelInstagram(env, reel.video_url, descricao);
+      if (ig) {
+        igUrl = ig.url;
+        await db.from("reels").update({ ig_media_id: ig.mediaId, ig_post_url: ig.url }).eq("id", id);
+      }
+    } catch (e) {
+      await db.from("reels").update({ erro: `Instagram: ${e instanceof Error ? e.message : e}` }).eq("id", id);
+    }
+  }
+  await db.from("reels").update({ status: "publicado" }).eq("id", id);
+  return { ok: true, url: fbUrl, instagram: igUrl };
 }
 
 export default {

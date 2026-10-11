@@ -152,6 +152,11 @@ function CartaoReel({ reel }: { reel: Reel }) {
               Ver no Facebook
             </a>
           )}
+          {reel.ig_post_url && (
+            <a href={reel.ig_post_url} target="_blank" rel="noreferrer" className="rounded-lg bg-pink-600 px-3 py-1.5 font-semibold">
+              Ver no Instagram
+            </a>
+          )}
           {reel.status === "pronto" && (
             <button
               disabled={ocupado}
