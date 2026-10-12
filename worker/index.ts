@@ -4,7 +4,7 @@ import { atualizarMetricas, coletar, supa } from "./coleta";
 import { buscarVideos } from "./coletores";
 import { apagarInstagram, publicarReel, publicarReelInstagram } from "./facebook";
 import { dispararRender } from "./github";
-import { paginaNoticia, site } from "./site";
+import { paginaCategoria, paginaNoticia, site, sitemap } from "./site";
 import { gerarAprendizados } from "./aprendizados";
 
 const CRON_METRICAS = "2,32 * * * *";
@@ -14,7 +14,18 @@ const app = new Hono<App>().basePath("/api");
 
 app.onError((e, c) => {
   console.error(e);
-  return c.json({ erro: e.message }, 500);
+  // (12) não revela detalhes internos ao público; mensagens de validação (P0001) e o painel admin continuam claras
+  const publico = c.req.path.startsWith("/api/site/");
+  const validacao = (e as { code?: string }).code === "P0001" || /CPF|login|Muitas/i.test(e.message);
+  return c.json({ erro: publico && !validacao ? "Não foi possível concluir agora. Tente novamente." : e.message }, 500);
+});
+
+// cabeçalhos de segurança também nas respostas da API
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Cache-Control", "no-store");
 });
 
 // Rotas internas (chamadas pelo pipeline do GitHub Actions)
@@ -195,7 +206,10 @@ function slugify(texto: string, id: string) {
 
 export default {
   fetch(req, env, ctx) {
-    if (new URL(req.url).pathname.startsWith("/n/")) return paginaNoticia(req, env);
+    const caminho = new URL(req.url).pathname;
+    if (caminho.startsWith("/n/")) return paginaNoticia(req, env);
+    if (caminho.startsWith("/c/")) return paginaCategoria(req, env);
+    if (caminho === "/sitemap.xml" || caminho === "/sitemap-noticias.xml") return sitemap(req, env);
     return app.fetch(req, env, ctx);
   },
   async scheduled(ctrl, env, ctx) {

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /painel
+Disallow: /api/
+Disallow: /conta
+Disallow: /busca
+
+Sitemap: https://planetadiario.online/sitemap.xml
+Sitemap: https://planetadiario.online/sitemap-noticias.xml

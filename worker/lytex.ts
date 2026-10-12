@@ -45,7 +45,7 @@ export async function criarPix(
   referencia: string,
 ) {
   const cpf = cliente.cpf.replace(/\D/g, "");
-  if (cpf.length !== 11 && cpf.length !== 14) throw new Error("Informe um CPF válido");
+  if (!cpfValido(cpf)) throw new Error("Informe um CPF válido");
   let tel = cliente.telefone.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
   if (tel.length < 10) tel = "11987654321";
 
@@ -69,4 +69,16 @@ export async function criarPix(
 export function consultarFatura(env: Bindings, id: string) {
   if (!/^[A-Za-z0-9_-]{10,64}$/.test(id)) throw new Error("fatura inválida");
   return chamar<Fatura>(env, "GET", `/v2/invoices/${id}`);
+}
+
+/** (3) validação real do CPF no servidor (dígitos verificadores) */
+export function cpfValido(cpf: string) {
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  const dv = (n: number) => {
+    let soma = 0;
+    for (let i = 0; i < n; i++) soma += Number(cpf[i]) * (n + 1 - i);
+    const r = (soma * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return dv(9) === Number(cpf[9]) && dv(10) === Number(cpf[10]);
 }

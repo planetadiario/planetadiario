@@ -100,36 +100,157 @@ async function ativar(db: SupabaseClient, ass: { id: string; usuario_id: string 
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+const semEmoji = (s: string) => s.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}]/gu, "").replace(/\s{2,}/g, " ").trim();
 
-/** /n/:slug — devolve o app com as meta tags da notícia (prévia no WhatsApp/Facebook) */
+const CATEGORIAS: Record<string, string> = {
+  noticias: "Brasil", urgente: "Urgente", mundo: "Mundo", esportes: "Esportes", famosos: "Famosos", viral: "Viral",
+  curiosidades: "Curiosidades", emocionante: "Emocionante", animais: "Animais", natureza: "Natureza", ciencia: "Ciência",
+  tecnologia: "Tecnologia", saude: "Saúde", economia: "Economia", policia: "Polícia", humor: "Humor",
+};
+
+/** /n/:slug — HTML com meta tags, dados estruturados (NewsArticle) e o texto já renderizado para buscadores */
 export async function paginaNoticia(req: Request, env: Bindings) {
   const url = new URL(req.url);
   const html = await env.ASSETS.fetch(new Request(new URL("/", url)));
   const slug = decodeURIComponent(url.pathname.split("/")[2] ?? "");
   const { data } = await supa(env)
     .from("reels")
-    .select("manchete, legenda, thumb_url, exclusivo")
+    .select("manchete, legenda, artigo, thumb_url, video_url, exclusivo, categoria, site_publicado_em, liberado_em, atualizado_em, origem_autor")
     .eq("slug", slug)
     .not("site_publicado_em", "is", null)
     .maybeSingle();
   if (!data) return html;
 
-  const titulo = esc(`${data.manchete ?? "Notícia"} | Planeta Diário`);
-  const desc = esc((data.exclusivo ? "Conteúdo exclusivo para assinantes." : (data.legenda ?? "").split("\n")[0]).slice(0, 200));
-  const img = esc(data.thumb_url ?? `${url.origin}/logo.png`);
+  // antes de liberar ao público (acesso antecipado) ou se exclusivo: só os metadados, sem o texto
+  const liberado = !data.liberado_em || Date.parse(data.liberado_em) <= Date.now();
+  const aberto = liberado && !data.exclusivo;
+  const canonica = `${url.origin}/n/${slug}`;
+  const manchete = data.manchete ?? "Notícia";
+  const titulo = esc(`${manchete} | Planeta Diário`);
+  const paragrafos = (data.artigo ?? data.legenda ?? "")
+    .split(/\n\s*\n/)
+    .map(semEmoji)
+    .filter((p: string) => p && !/^(Siga a Planeta|Créditos|#)/i.test(p));
+  const desc = esc((data.exclusivo ? "Conteúdo exclusivo para assinantes do Planeta Diário." : paragrafos[0] ?? manchete).slice(0, 200));
+  const img = esc(data.thumb_url ?? `${url.origin}/icone-512.png`);
+  const categoria = CATEGORIAS[data.categoria] ?? "Notícias";
+
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: manchete.slice(0, 110),
+    description: paragrafos[0] ?? manchete,
+    image: [data.thumb_url ?? `${url.origin}/icone-512.png`],
+    datePublished: data.site_publicado_em,
+    dateModified: data.atualizado_em ?? data.site_publicado_em,
+    articleSection: categoria,
+    inLanguage: "pt-BR",
+    mainEntityOfPage: canonica,
+    isAccessibleForFree: !data.exclusivo,
+    author: { "@type": "Organization", name: "Planeta Diário", url: url.origin },
+    publisher: { "@type": "Organization", name: "Planeta Diário", logo: { "@type": "ImageObject", url: `${url.origin}/icone-512.png` } },
+    ...(data.video_url && aberto
+      ? { video: { "@type": "VideoObject", name: manchete, description: paragrafos[0] ?? manchete, thumbnailUrl: data.thumb_url, contentUrl: data.video_url, uploadDate: data.site_publicado_em } }
+      : {}),
+  };
+
   const metas = [
     `<meta name="description" content="${desc}">`,
+    `<link rel="canonical" href="${esc(canonica)}">`,
     `<meta property="og:type" content="article">`,
     `<meta property="og:site_name" content="Planeta Diário">`,
+    `<meta property="og:locale" content="pt_BR">`,
     `<meta property="og:title" content="${titulo}">`,
     `<meta property="og:description" content="${desc}">`,
     `<meta property="og:image" content="${img}">`,
-    `<meta property="og:url" content="${esc(url.href)}">`,
+    `<meta property="og:url" content="${esc(canonica)}">`,
+    `<meta property="article:published_time" content="${esc(data.site_publicado_em)}">`,
+    `<meta property="article:section" content="${esc(categoria)}">`,
     `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${titulo}">`,
+    `<meta name="twitter:description" content="${desc}">`,
+    `<meta name="twitter:image" content="${img}">`,
+    liberado ? "" : `<meta name="robots" content="noindex">`,
+    `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script>`,
   ].join("");
+
+  // conteúdo legível sem JavaScript (o app substitui ao carregar)
+  const corpo = `<article style="max-width:720px;margin:2rem auto;padding:0 1rem;font-family:sans-serif">
+<p><a href="/c/${esc(data.categoria)}">${esc(categoria)}</a> · <time datetime="${esc(data.site_publicado_em)}">${new Date(data.site_publicado_em).toLocaleDateString("pt-BR")}</time></p>
+<h1>${esc(manchete)}</h1>
+${data.thumb_url ? `<img src="${img}" alt="${esc(manchete)}" width="360" height="640" style="max-width:100%;height:auto">` : ""}
+${aberto ? paragrafos.map((p: string) => `<p>${esc(p)}</p>`).join("") : "<p>Conteúdo disponível para assinantes do Planeta Diário.</p>"}
+${aberto && data.origem_autor ? `<p>Vídeo: ${esc(data.origem_autor)}</p>` : ""}
+</article>`;
+
   return new HTMLRewriter()
     .on("title", { element: (e) => void e.setInnerContent(titulo, { html: true }) })
-    .on('meta[name="description"], meta[property="og:image"]', { element: (e) => void e.remove() })
+    .on('meta[name="description"], meta[property="og:image"], link[rel="canonical"]', { element: (e) => void e.remove() })
     .on("head", { element: (e) => void e.append(metas, { html: true }) })
+    .on("#root", { element: (e) => void e.setInnerContent(corpo, { html: true }) })
     .transform(html);
+}
+
+/** /c/:categoria — título e descrição próprios para cada categoria */
+export async function paginaCategoria(req: Request, env: Bindings) {
+  const url = new URL(req.url);
+  const html = await env.ASSETS.fetch(new Request(new URL("/", url)));
+  const slug = url.pathname.split("/")[2] ?? "";
+  const nome = CATEGORIAS[slug];
+  if (!nome) return html;
+  const titulo = esc(`${nome}: últimas notícias em vídeo | Planeta Diário`);
+  const desc = esc(`As últimas notícias de ${nome.toLowerCase()} em vídeo, atualizadas a todo momento pelo Planeta Diário.`);
+  const canonica = esc(`${url.origin}/c/${slug}`);
+  return new HTMLRewriter()
+    .on("title", { element: (e) => void e.setInnerContent(titulo, { html: true }) })
+    .on('meta[name="description"]', { element: (e) => void e.remove() })
+    .on("head", {
+      element: (e) =>
+        void e.append(
+          `<meta name="description" content="${desc}"><link rel="canonical" href="${canonica}"><meta property="og:title" content="${titulo}"><meta property="og:description" content="${desc}"><meta property="og:url" content="${canonica}">`,
+          { html: true },
+        ),
+    })
+    .transform(html);
+}
+
+/** sitemap.xml (todas as páginas) e sitemap-noticias.xml (Google Notícias, últimas 48 h) */
+export async function sitemap(req: Request, env: Bindings) {
+  const url = new URL(req.url);
+  const noticias = url.pathname === "/sitemap-noticias.xml";
+  const agora = new Date().toISOString();
+  let q = supa(env)
+    .from("reels")
+    .select("slug, manchete, site_publicado_em, atualizado_em, thumb_url")
+    .not("site_publicado_em", "is", null)
+    .lte("liberado_em", agora)
+    .order("site_publicado_em", { ascending: false })
+    .limit(noticias ? 1000 : 5000);
+  if (noticias) q = q.gte("site_publicado_em", new Date(Date.now() - 48 * 3600_000).toISOString());
+  const { data } = await q;
+  const o = url.origin;
+
+  let xml: string;
+  if (noticias) {
+    xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+${(data ?? [])
+  .map(
+    (n) => `<url><loc>${o}/n/${esc(n.slug)}</loc><news:news><news:publication><news:name>Planeta Diário</news:name><news:language>pt</news:language></news:publication><news:publication_date>${n.site_publicado_em}</news:publication_date><news:title>${esc(n.manchete ?? "")}</news:title></news:news></url>`,
+  )
+  .join("\n")}
+</urlset>`;
+  } else {
+    const fixas = ["/", "/reels", "/assinar", ...Object.keys(CATEGORIAS).map((c) => `/c/${c}`)];
+    xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+${fixas.map((p) => `<url><loc>${o}${p}</loc><changefreq>hourly</changefreq></url>`).join("\n")}
+${(data ?? [])
+  .map(
+    (n) => `<url><loc>${o}/n/${esc(n.slug)}</loc><lastmod>${n.atualizado_em ?? n.site_publicado_em}</lastmod>${n.thumb_url ? `<image:image><image:loc>${esc(n.thumb_url)}</image:loc></image:image>` : ""}</url>`,
+  )
+  .join("\n")}
+</urlset>`;
+  }
+  return new Response(xml, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=600" } });
 }
