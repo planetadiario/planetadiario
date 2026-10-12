@@ -245,6 +245,12 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             )
             print(r.status_code, r.text)
             r.raise_for_status()
+            print("📤 publicando no Instagram")
+            ri = requests.post(
+                f"{os.environ['WORKER_URL'].rstrip('/')}/api/interno/publicar-instagram/{reel_id}",
+                headers={"x-internal-secret": os.environ["INTERNAL_SECRET"]}, timeout=400,
+            )
+            print(ri.status_code, ri.text)
     except Exception as e:
         traceback.print_exc()
         msg = str(e).splitlines()[0][:500] if str(e) else type(e).__name__

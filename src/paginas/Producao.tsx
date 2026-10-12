@@ -94,6 +94,7 @@ function CartaoReel({ reel }: { reel: Reel }) {
   const [tags, setTags] = useState(reel.hashtags.join(" "));
   const [ocupado, setOcupado] = useState(false);
   const [msg, setMsg] = useState("");
+  const [msgOk, setMsgOk] = useState("");
   const st = STATUS[reel.status];
   const editado = legenda !== (reel.legenda ?? "") || tags !== reel.hashtags.join(" ");
 
@@ -163,6 +164,7 @@ function CartaoReel({ reel }: { reel: Reel }) {
         )}
 
         {msg && <p className="text-xs text-red-400">{msg}</p>}
+        {msgOk && <p className="text-xs text-emerald-500">{msgOk}</p>}
 
         <div className="mt-auto flex flex-wrap gap-2 pt-2">
           {reel.status === "publicado" && reel.fb_post_url && (
@@ -192,7 +194,7 @@ function CartaoReel({ reel }: { reel: Reel }) {
           {reel.status === "publicado" && !reel.ig_post_url && (
             <button
               disabled={ocupado}
-              onClick={() => acao(() => api(`/reels/${reel.id}/publicar`, { method: "POST" }))}
+              onClick={() => acao(() => api(`/reels/${reel.id}/instagram`, { method: "POST" }))}
               className="rounded-lg bg-ig px-3 py-1.5 font-semibold text-white disabled:opacity-60"
             >
               Tentar Instagram de novo
@@ -201,7 +203,15 @@ function CartaoReel({ reel }: { reel: Reel }) {
           {reel.status === "pronto" && (
             <button
               disabled={ocupado}
-              onClick={() => acao(async () => { if (editado) await salvar(); await api(`/reels/${reel.id}/publicar`, { method: "POST" }); })}
+              onClick={() =>
+                acao(async () => {
+                  if (editado) await salvar();
+                  await api(`/reels/${reel.id}/publicar`, { method: "POST" });
+                  setMsgOk("Publicado no Facebook e no site. Publicando no Instagram…");
+                  await api(`/reels/${reel.id}/instagram`, { method: "POST" });
+                  setMsgOk("");
+                })
+              }
               className="rounded-lg bg-marca px-3 py-1.5 font-semibold text-white disabled:opacity-60"
             >
               {ocupado ? "…" : "Publicar agora"}

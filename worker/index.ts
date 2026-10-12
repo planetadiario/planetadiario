@@ -8,6 +8,7 @@ import { paginaCategoria, paginaNoticia, site, sitemap } from "./site";
 import { gerarAprendizados } from "./aprendizados";
 
 const CRON_METRICAS = "2,32 * * * *";
+const CRON_INSTAGRAM = "7-57/10 * * * *";
 
 type App = { Bindings: Bindings; Variables: { email: string } };
 const app = new Hono<App>().basePath("/api");
@@ -31,7 +32,7 @@ app.use("*", async (c, next) => {
 // Rotas internas (chamadas pelo pipeline do GitHub Actions)
 app.post("/interno/publicar/:id", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
-  return c.json(await publicar(c.env, c.req.param("id"), c.executionCtx));
+  return c.json(await publicar(c.env, c.req.param("id")));
 });
 
 app.post("/interno/publicar-instagram/:id", async (c) => {
@@ -161,7 +162,8 @@ app.post("/reels/:id/renderizar", async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/reels/:id/publicar", async (c) => c.json(await publicar(c.env, c.req.param("id"), c.executionCtx)));
+app.post("/reels/:id/publicar", async (c) => c.json(await publicar(c.env, c.req.param("id"))));
+app.post("/reels/:id/instagram", async (c) => c.json(await publicarInstagram(c.env, c.req.param("id"))));
 
 async function legendas(env: Bindings, reel: { legenda: string | null; hashtags: string[] }) {
   const db = supa(env);
@@ -178,7 +180,7 @@ async function legendas(env: Bindings, reel: { legenda: string | null; hashtags:
  * o Instagram consulta o processamento várias vezes e estouraria o limite de
  * conexões por execução do plano grátis da Cloudflare.
  */
-async function publicar(env: Bindings, id: string, ctx?: { waitUntil(p: Promise<unknown>): void }) {
+async function publicar(env: Bindings, id: string) {
   const db = supa(env);
   const { data: reel, error } = await db.from("reels").select("*").eq("id", id).single();
   if (error) throw error;
@@ -216,16 +218,9 @@ async function publicar(env: Bindings, id: string, ctx?: { waitUntil(p: Promise<
   }
   await db.from("reels").update(extra).eq("id", id);
 
-  // Instagram em outra execução (limite próprio de conexões)
-  if (!reel.ig_media_id) {
-    const chamada = fetch(`${env.SITE_URL}/api/interno/publicar-instagram/${id}`, {
-      method: "POST",
-      headers: { "x-internal-secret": env.INTERNAL_SECRET },
-    });
-    if (ctx) ctx.waitUntil(chamada);
-    else await chamada;
-  }
-  return { ok: true, url: fbUrl, instagram: reel.ig_post_url ?? "publicando" };
+  // o Instagram é publicado numa chamada separada (leva ~45 s e muitas consultas):
+  // navegador, pipeline ou o agendamento de pendências chamam /instagram em seguida
+  return { ok: true, url: fbUrl, instagram: reel.ig_post_url ?? "pendente" };
 }
 
 /** Instagram (conta profissional vinculada à página); falha aqui não desfaz o Facebook */
@@ -249,6 +244,22 @@ async function publicarInstagram(env: Bindings, id: string) {
   }
 }
 
+/** Rede de segurança: publica no Instagram 1 Reel que ficou só no Facebook (a cada 10 min) */
+async function instagramPendente(env: Bindings) {
+  const { data } = await supa(env)
+    .from("reels")
+    .select("id")
+    .eq("status", "publicado")
+    .is("ig_media_id", null)
+    .not("video_ig_url", "is", null)
+    .not("fb_video_id", "is", null)
+    .gte("publicado_em", new Date(Date.now() - 24 * 3600_000).toISOString())
+    .lt("publicado_em", new Date(Date.now() - 3 * 60_000).toISOString())
+    .order("publicado_em", { ascending: true })
+    .limit(1);
+  if (data?.[0]) await publicarInstagram(env, data[0].id);
+}
+
 function slugify(texto: string, id: string) {
   const base = texto
     .normalize("NFD")
@@ -269,6 +280,10 @@ export default {
     return app.fetch(req, env, ctx);
   },
   async scheduled(ctrl, env, ctx) {
+    if (ctrl.cron === CRON_INSTAGRAM) {
+      ctx.waitUntil(instagramPendente(env).then(() => undefined));
+      return;
+    }
     if (ctrl.cron === CRON_METRICAS) {
       // uma vez por dia (6h05 em Brasília) a IA revisa o desempenho e atualiza os aprendizados
       const agora = new Date(ctrl.scheduledTime);

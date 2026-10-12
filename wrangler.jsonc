@@ -14,8 +14,8 @@
     { "pattern": "planetadiario.online/*", "zone_name": "planetadiario.online" },
     { "pattern": "www.planetadiario.online/*", "zone_name": "planetadiario.online" }
   ],
-  // Coleta a cada 5 minutos (fontes alternadas); métricas dos posts a cada 30 minutos
-  "triggers": { "crons": ["*/5 * * * *", "2,32 * * * *"] },
+  // Coleta a cada 5 min; métricas a cada 30 min; Instagram pendente a cada 10 min
+  "triggers": { "crons": ["*/5 * * * *", "2,32 * * * *", "7-57/10 * * * *"] },
   "observability": { "enabled": true },
   "workers_dev": true,
   "preview_urls": false,
