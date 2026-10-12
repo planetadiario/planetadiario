@@ -100,7 +100,7 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
         </p>
       )}
 
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1 text-sm">
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1 text-sm [scrollbar-width:none]">
         <Filtro ativo={!cat} onClick={() => setCat("")}>Todas</Filtro>
         {categorias.filter((c) => c.ativa).map((c) => (
           <Filtro key={c.slug} ativo={cat === c.slug} onClick={() => setCat(c.slug)}>
