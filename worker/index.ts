@@ -67,6 +67,19 @@ app.post("/interno/coletar", async (c) => {
   return c.json({ log: await coletar(c.env, g === "par" || g === "impar" ? g : undefined) });
 });
 
+// diagnóstico: como o Facebook recebeu os Reels (status, direitos autorais, link)
+app.post("/interno/diagnostico-fb", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  const { data } = await supa(c.env).from("reels").select("fb_video_id, manchete").not("fb_video_id", "is", null).order("publicado_em", { ascending: false }).limit(5);
+  const g = `https://graph.facebook.com/${c.env.FB_GRAPH_VERSION}`;
+  const out = [];
+  for (const r of data ?? []) {
+    const resp = await fetch(`${g}/${r.fb_video_id}?fields=status,published,permalink_url,length,copyright_check_information,post_id&access_token=${c.env.FB_PAGE_TOKEN}`);
+    out.push({ manchete: r.manchete?.slice(0, 50), ...((await resp.json()) as Record<string, unknown>) });
+  }
+  return c.json(out);
+});
+
 app.post("/interno/metricas", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
   return c.json({ log: await atualizarMetricas(c.env) });
