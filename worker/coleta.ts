@@ -359,11 +359,11 @@ async function buscarVideosQuentes(env: Bindings, db: SupabaseClient, log: strin
     .select("id, titulo, titulo_pt, score, extra")
     .eq("analisado", true)
     .is("video_url", null)
-    .gte("score", 70)
+    .gte("score", 60)
     .gte("detectado_em", new Date(Date.now() - 6 * 3600_000).toISOString())
     .order("score", { ascending: false })
     .limit(10);
-  const pendentes = (data ?? []).filter((t) => !t.extra?.buscado).slice(0, usarYoutube ? 1 : 2);
+  const pendentes = (data ?? []).filter((t) => !t.extra?.buscado).slice(0, usarYoutube ? 2 : 3);
   for (const t of pendentes) {
     const busca = String(t.extra?.busca ?? t.titulo);
     const videos = (await buscarVideos(env, busca, usarYoutube)).filter((v) => Number(v.extra?.duracao ?? 0) <= 240);
