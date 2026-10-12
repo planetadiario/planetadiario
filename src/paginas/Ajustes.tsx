@@ -137,14 +137,14 @@ export default function Ajustes() {
               <h3 className="font-semibold">Narração em português + legendas</h3>
               <p className="text-sm text-suave">A IA escreve, uma voz narra e as legendas entram no vídeo. Torna o conteúdo transformado (ajuda na monetização) e traduz vídeos de fora.</p>
             </div>
-            <Chave ligada={!!cfg.narracao?.ativa} onClick={() => gravar("narracao", { ativa: !cfg.narracao?.ativa, voz: cfg.narracao?.voz ?? "cadu-grave" })} />
+            <Chave ligada={!!cfg.narracao?.ativa} onClick={() => gravar("narracao", { ativa: !cfg.narracao?.ativa, voz: cfg.narracao?.voz ?? "cadu" })} />
           </div>
           <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            {["cadu-grave", "cadu", "jeff", "faber"].map((v) => (
+            {["cadu", "jeff", "faber"].map((v) => (
               <button
                 key={v}
                 onClick={() => gravar("narracao", { ativa: !!cfg.narracao?.ativa, voz: v })}
-                className={`rounded-lg border px-3 py-1.5 capitalize ${(cfg.narracao?.voz ?? "cadu-grave") === v ? "border-marca bg-marca/10 font-semibold text-marca" : "border-borda"}`}
+                className={`rounded-lg border px-3 py-1.5 capitalize ${(cfg.narracao?.voz ?? "cadu") === v ? "border-marca bg-marca/10 font-semibold text-marca" : "border-borda"}`}
               >
                 Voz {v.replace("-grave", " (grave)")}
               </button>
