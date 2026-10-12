@@ -398,7 +398,7 @@ export async function urlConectar(env: Bindings, rede: Rede) {
       client_id: env.THREADS_APP_ID,
       redirect_uri: retorno(env, rede),
       response_type: "code",
-      scope: "threads_basic,threads_content_publish",
+      scope: "threads_basic,threads_content_publish,threads_manage_insights",
       state,
     })}`;
   }
@@ -475,4 +475,79 @@ export async function concluirConexao(env: Bindings, rede: Rede, code: string, s
       expira: Date.now() + (longo.expires_in ?? 3600) * 1000,
     });
   }
+}
+
+/* ------------------------------ Métricas das redes extras ------------------------------ */
+
+/**
+ * Seguidores do dia (YouTube, Telegram, Threads) e visualizações de cada Short.
+ * Roda numa execução própria (/interno/metricas-redes) para não somar chamadas com as do Facebook/Instagram.
+ */
+export async function metricasRedes(env: Bindings) {
+  const db = supa(env);
+  const log: string[] = [];
+  const hoje: Record<string, number> = {};
+
+  // YouTube: inscritos do canal e estatísticas dos Shorts (1 chamada para até 50 vídeos)
+  const yt = await integracao(db, "youtube");
+  if (yt?.canal_id && env.YOUTUBE_API_KEY) {
+    try {
+      const c = (await (
+        await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${yt.canal_id}&key=${env.YOUTUBE_API_KEY}`)
+      ).json()) as { items?: { statistics: { subscriberCount?: string } }[] };
+      hoje.yt = Number(c.items?.[0]?.statistics.subscriberCount ?? 0);
+    } catch (e) {
+      log.push(`youtube canal: ${e instanceof Error ? e.message : e}`);
+    }
+    const { data: shorts } = await db
+      .from("reels")
+      .select("id, yt_id, metricas")
+      .not("yt_id", "is", null)
+      .gte("publicado_em", new Date(Date.now() - 90 * 86400_000).toISOString())
+      .order("publicado_em", { ascending: false })
+      .limit(30);
+    if (shorts?.length) {
+      const v = (await (
+        await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${shorts.map((s) => s.yt_id).join(",")}&key=${env.YOUTUBE_API_KEY}`)
+      ).json()) as { items?: { id: string; statistics: { viewCount?: string; likeCount?: string; commentCount?: string } }[] };
+      const porId = new Map((v.items ?? []).map((i) => [i.id, i.statistics]));
+      for (const s of shorts) {
+        const st = porId.get(s.yt_id!);
+        if (!st) continue;
+        const metricas = {
+          ...(s.metricas ?? {}),
+          yt_views: Number(st.viewCount ?? 0),
+          yt_curtidas: Number(st.likeCount ?? 0),
+          yt_comentarios: Number(st.commentCount ?? 0),
+        };
+        await db.from("reels").update({ metricas }).eq("id", s.id);
+      }
+      log.push(`youtube: ${porId.size} Shorts atualizados`);
+    }
+  }
+
+  // Telegram: inscritos do canal
+  if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CANAL) {
+    const r = (await (
+      await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getChatMemberCount?chat_id=${encodeURIComponent(env.TELEGRAM_CANAL)}`)
+    ).json()) as { ok: boolean; result?: number };
+    if (r.ok) hoje.tg = r.result ?? 0;
+  }
+
+  // Threads: seguidores (precisa da permissão de insights; sem ela, fica em branco)
+  const th = await integracao(db, "threads");
+  if (th?.token) {
+    const r = (await (
+      await fetch(`https://graph.threads.net/v1.0/${th.user_id}/threads_insights?metric=followers_count&access_token=${th.token}`)
+    ).json()) as { data?: { total_value?: { value: number } }[]; error?: { message: string } };
+    if (r.data?.[0]?.total_value) hoje.threads = r.data[0].total_value.value;
+    else if (r.error) log.push(`threads: ${r.error.message.slice(0, 80)}`);
+  }
+
+  if (Object.keys(hoje).length) {
+    const dia = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    await db.from("seguidores_historico").upsert({ dia, ...hoje, atualizado_em: new Date().toISOString() });
+  }
+  log.push(`seguidores: ${JSON.stringify(hoje)}`);
+  return log;
 }

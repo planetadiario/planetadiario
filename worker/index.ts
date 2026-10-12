@@ -7,7 +7,7 @@ import { dispararRender, dispararTarefa } from "./github";
 import { paginaCategoria, paginaNoticia, site, sitemap } from "./site";
 import { gerarAprendizados } from "./aprendizados";
 import { alertasAntecipados, atualizacaoTelegram, configurarBot, segredoWebhook } from "./telegram-bot";
-import { REDES, concluirConexao, publicarPendente, situacaoRedes, urlConectar, type Rede } from "./redes";
+import { REDES, concluirConexao, metricasRedes, publicarPendente, situacaoRedes, urlConectar, type Rede } from "./redes";
 
 const CRON_METRICAS = "2,32 * * * *";
 const CRON_INSTAGRAM = "7-57/10 * * * *";
@@ -85,6 +85,11 @@ app.post("/interno/diagnostico-fb", async (c) => {
 app.post("/interno/metricas", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
   return c.json({ log: await atualizarMetricas(c.env) });
+});
+
+app.post("/interno/metricas-redes", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  return c.json({ log: await metricasRedes(c.env) });
 });
 
 app.post("/interno/aprendizados", async (c) => {
@@ -211,6 +216,52 @@ app.get("/monetizacao", async (c) => {
     minutos_60d: { fb: Math.round(minFb), ig: Math.round(minIg) },
     reels_30d: lista.filter((r) => Date.parse(r.publicado_em) >= desde30).length,
     reels_hoje: lista.filter((r) => new Date(r.publicado_em).toDateString() === new Date().toDateString()).length,
+  });
+});
+
+// painel: números e metas de monetização de cada rede
+app.get("/monetizacao/redes", async (c) => {
+  const db = supa(c.env);
+  const dias = (n: number) => new Date(Date.now() - n * 86400_000).toISOString();
+  const [hist, reels, cfg, bot] = await Promise.all([
+    db.from("seguidores_historico").select("*").order("dia", { ascending: false }).limit(90),
+    db
+      .from("reels")
+      .select("publicado_em, metricas, fb_video_id, ig_media_id, yt_id, tt_id, tg_msg_id, threads_id")
+      .eq("status", "publicado")
+      .gte("publicado_em", dias(90)),
+    db.from("config").select("valor").eq("chave", "metas_redes").maybeSingle(),
+    db.from("bot_compras").select("valor_centavos, tipo, pago_em").eq("status", "pago"),
+  ]);
+  const lista = reels.data ?? [];
+  const h = hist.data ?? [];
+  const n = (m: Record<string, unknown> | null, k: string) => Number(m?.[k] ?? 0);
+  const soma = (k: string, desde: number) =>
+    lista.filter((r) => Date.parse(r.publicado_em) >= Date.now() - desde * 86400_000).reduce((s, r) => s + n(r.metricas, k), 0);
+  const posts = (col: string, desde: number) =>
+    lista.filter((r) => (r as Record<string, unknown>)[col] && Date.parse(r.publicado_em) >= Date.now() - desde * 86400_000).length;
+  // seguidores atuais, ganho em 7 dias e série para o gráfico
+  const seg = (col: string) => {
+    const serie = h.filter((x) => x[col] != null).map((x) => ({ dia: x.dia, v: Number(x[col]) })).reverse();
+    const atual = serie.at(-1)?.v ?? null;
+    const antigo = serie.find((x) => Date.parse(x.dia) >= Date.now() - 8 * 86400_000)?.v ?? null;
+    return { atual, ganho7: atual != null && antigo != null ? atual - antigo : null, serie: serie.slice(-30) };
+  };
+  return c.json({
+    metas: cfg.data?.valor ?? {},
+    redes: {
+      facebook: { seguidores: seg("fb"), views_30d: soma("fb_views", 30), minutos_60d: Math.round(soma("fb_tempo_total_ms", 60) / 60000), posts_30d: posts("fb_video_id", 30) },
+      instagram: { seguidores: seg("ig"), views_30d: soma("ig_views", 30), alcance_30d: soma("ig_alcance", 30), minutos_60d: Math.round(soma("ig_tempo_total_ms", 60) / 60000), posts_30d: posts("ig_media_id", 30) },
+      youtube: { seguidores: seg("yt"), views_30d: soma("yt_views", 30), views_90d: soma("yt_views", 90), posts_30d: posts("yt_id", 30), posts_90d: posts("yt_id", 90) },
+      tiktok: { seguidores: seg("tt"), views_30d: null, posts_30d: posts("tt_id", 30) },
+      telegram: {
+        seguidores: seg("tg"),
+        posts_30d: posts("tg_msg_id", 30),
+        receita_bot: (bot.data ?? []).reduce((s, b) => s + b.valor_centavos, 0),
+        vendas_bot: (bot.data ?? []).length,
+      },
+      threads: { seguidores: seg("threads"), posts_30d: posts("threads_id", 30) },
+    },
   });
 });
 
@@ -401,7 +452,7 @@ export default {
     if (ctrl.cron === CRON_INSTAGRAM) rota = ["instagram-pendente", ...REDES.map((r) => `redes/${r}`)].join(" ");
     else if (ctrl.cron === CRON_METRICAS) {
       // uma vez por dia (6h05 em Brasília) a IA revisa o desempenho e atualiza os aprendizados
-      rota = agora.getUTCHours() === 9 && agora.getUTCMinutes() < 30 ? "aprendizados" : "metricas";
+      rota = agora.getUTCHours() === 9 && agora.getUTCMinutes() < 30 ? "aprendizados" : "metricas metricas-redes";
     } else {
       // mesma alternância de grupos da coleta direta
       rota = `coletar?grupo=${Math.floor(agora.getTime() / 300_000) % 2 === 0 ? "par" : "impar"}`;

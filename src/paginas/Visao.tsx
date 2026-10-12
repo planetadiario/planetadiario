@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import Icone from "../Icone";
 import { numeroCurto } from "../api";
 import MetasMonetizacao from "./MetasMonetizacao";
+import IconeRede from "../IconeRede";
 
 interface Metricas {
   fb_curtidas: number;
@@ -11,6 +12,9 @@ interface Metricas {
   ig_comentarios: number;
   fb_views?: number;
   ig_views?: number;
+  yt_views?: number;
+  yt_curtidas?: number;
+  yt_comentarios?: number;
   ig_alcance?: number;
   fb_tempo_medio_ms?: number;
   ig_tempo_medio_ms?: number;
@@ -22,6 +26,9 @@ interface ReelPub {
   thumb_url: string | null;
   fb_post_url: string | null;
   ig_post_url: string | null;
+  yt_url: string | null;
+  tg_url: string | null;
+  threads_url: string | null;
   publicado_em: string;
   metricas: Metricas | null;
 }
@@ -30,8 +37,9 @@ const PERIODOS = { "7 dias": 7, "30 dias": 30, "90 dias": 90 } as const;
 type Periodo = keyof typeof PERIODOS;
 const DIA = 86400_000;
 
-const eng = (m: Metricas | null) => (m ? m.fb_curtidas + m.fb_comentarios + m.ig_curtidas + m.ig_comentarios : 0);
-const views = (m: Metricas | null) => (m ? (m.fb_views ?? 0) + (m.ig_views ?? 0) : 0);
+const eng = (m: Metricas | null) =>
+  m ? m.fb_curtidas + m.fb_comentarios + m.ig_curtidas + m.ig_comentarios + (m.yt_curtidas ?? 0) + (m.yt_comentarios ?? 0) : 0;
+const views = (m: Metricas | null) => (m ? (m.fb_views ?? 0) + (m.ig_views ?? 0) + (m.yt_views ?? 0) : 0);
 
 export default function Visao() {
   const [periodo, setPeriodo] = useState<Periodo>("30 dias");
@@ -42,7 +50,7 @@ export default function Visao() {
     const desde = new Date(Date.now() - 2 * PERIODOS[periodo] * DIA).toISOString();
     supabase
       .from("reels")
-      .select("id, categoria, manchete, thumb_url, fb_post_url, ig_post_url, publicado_em, metricas")
+      .select("id, categoria, manchete, thumb_url, fb_post_url, ig_post_url, yt_url, tg_url, threads_url, publicado_em, metricas")
       .eq("status", "publicado")
       .gte("publicado_em", desde)
       .order("publicado_em")
@@ -169,8 +177,9 @@ export default function Visao() {
               <thead>
                 <tr className="text-left text-xs text-suave">
                   <th className="pb-2 font-medium">Reel</th>
-                  <th className="pb-2 text-right font-medium text-fb">Views FB</th>
-                  <th className="pb-2 text-right font-medium text-ig">Views IG</th>
+                  <th className="pb-2 text-right font-medium" title="Views no Facebook"><IconeRede rede="facebook" className="ml-auto size-4" /></th>
+                  <th className="pb-2 text-right font-medium" title="Views no Instagram"><IconeRede rede="instagram" className="ml-auto size-4" /></th>
+                  <th className="pb-2 text-right font-medium" title="Views no YouTube"><IconeRede rede="youtube" className="ml-auto size-4" /></th>
                   <th className="hidden pb-2 text-right font-medium md:table-cell">Retenção</th>
                   <th className="pb-2 text-right font-medium">Engaj.</th>
                 </tr>
@@ -185,7 +194,17 @@ export default function Visao() {
                         ) : (
                           <span className="h-12 w-7 shrink-0 rounded bg-painel-2" />
                         )}
-                        <span className="line-clamp-2">{r.manchete ?? "—"}</span>
+                        <span className="flex min-w-0 flex-col gap-1">
+                          <span className="line-clamp-2">{r.manchete ?? "—"}</span>
+                          {/* em quais redes este Reel saiu */}
+                          <span className="flex gap-1.5 opacity-80">
+                            {r.fb_post_url && <IconeRede rede="facebook" className="size-3.5" />}
+                            {r.ig_post_url && <IconeRede rede="instagram" className="size-3.5" />}
+                            {r.yt_url && <IconeRede rede="youtube" className="size-3.5" />}
+                            {r.threads_url && <IconeRede rede="threads" className="size-3.5" />}
+                            {r.tg_url && <IconeRede rede="telegram" className="size-3.5" />}
+                          </span>
+                        </span>
                       </div>
                     </td>
                     <td className="text-right tabular-nums">
@@ -193,6 +212,9 @@ export default function Visao() {
                     </td>
                     <td className="text-right tabular-nums">
                       {r.ig_post_url ? <a href={r.ig_post_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto(r.metricas?.ig_views ?? 0) || "0"}</a> : "—"}
+                    </td>
+                    <td className="text-right tabular-nums">
+                      {r.yt_url ? <a href={r.yt_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto(r.metricas?.yt_views ?? 0) || "0"}</a> : "—"}
                     </td>
                     <td className="hidden text-right text-xs tabular-nums text-suave md:table-cell" title="Tempo médio assistido (Facebook / Instagram)">
                       {r.metricas?.fb_tempo_medio_ms != null ? `${Math.round(r.metricas.fb_tempo_medio_ms / 1000)}s` : "—"} / {r.metricas?.ig_tempo_medio_ms != null ? `${Math.round(r.metricas.ig_tempo_medio_ms / 1000)}s` : "—"}
