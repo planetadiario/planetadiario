@@ -24,6 +24,7 @@ export interface Config {
   horarios_pico?: [number, number][];
   meta_posts_dia?: number;
   urgente_automatico?: boolean;
+  nota_quente?: number;
 }
 
 export const CANAIS_TELEGRAM_PADRAO = [
@@ -237,37 +238,18 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .select("id", { count: "exact", head: true })
     .gte("criado_em", inicioDia.toISOString())
     .not("status", "in", "(rejeitado,erro)");
-  if ((count ?? 0) >= cfg.max_posts_dia) return log.push("piloto: limite diário atingido");
+  const feitosHoje = count ?? 0;
 
-  // só publica nos horários de pico (Brasília)
   const hora = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hourCycle: "h23" }));
   const janelas = cfg.horarios_pico?.length ? cfg.horarios_pico : [[7, 9], [11, 14], [17, 23]];
-  if (!janelas.some(([a, b]) => hora >= a && hora < b)) return;
+  const noPico = janelas.some(([a, b]) => hora >= a && hora < b);
 
-  // ritmo: se estiver atrás da meta do dia, aceita nota um pouco menor (mínimo 60)
+  // ritmo: se estiver atrás da meta do dia, aceita nota um pouco menor
   const minutosPico = janelas.reduce((s, [a, b]) => s + (b - a) * 60, 0);
   const minutosPassados = janelas.reduce((s, [a, b]) => s + Math.max(0, Math.min(hora, b) - a) * 60, 0);
   const esperado = Math.floor(((cfg.meta_posts_dia ?? 8) * minutosPassados) / Math.max(1, minutosPico));
-  const atrasado = (count ?? 0) < esperado;
+  const atrasado = feitosHoje < esperado;
   const notaMinima = atrasado ? Math.max(45, cfg.score_minimo_auto - 5) : cfg.score_minimo_auto; // nota FINAL mínima
-
-  // reels em produção seguram a fila (evita publicar vários de uma vez)
-  const { count: emProducao } = await db
-    .from("reels")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["na_fila", "processando", "publicando"]);
-  if ((emProducao ?? 0) > 0) return;
-
-  // intervalo mínimo entre publicações automáticas
-  const intervalo = cfg.intervalo_min_minutos ?? 40;
-  const { data: ultimo } = await db
-    .from("reels")
-    .select("publicado_em")
-    .eq("status", "publicado")
-    .order("publicado_em", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (ultimo?.publicado_em && Date.now() - Date.parse(ultimo.publicado_em) < intervalo * 60_000) return;
 
   // candidatos: nota da IA >= 50 (qualidade mínima); a ordem usa a nota final (IA + popularidade real)
   const desde = new Date(Date.now() - 12 * 3600_000).toISOString();
@@ -285,7 +267,36 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .filter((t) => t.nota_final >= notaMinima)
     .sort((a, b) => b.nota_final - a.nota_final)
     .slice(0, 5);
-  if (candidatos[0]) log.push(`piloto: melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
+  if (!candidatos[0]) return;
+
+  // NOTÍCIA QUENTE (nota alta e recente) fura a fila: quem publica primeiro leva as visualizações.
+  // Ignora o horário de pico (das 6h à meia-noite), usa intervalo curto e pode passar um pouco do limite diário.
+  const notaQuente = cfg.nota_quente ?? 80;
+  const idadeMin = (Date.now() - Date.parse(String(candidatos[0].detectado_em))) / 60_000;
+  const quente = candidatos[0].nota_final >= notaQuente && idadeMin <= 180;
+
+  if (feitosHoje >= cfg.max_posts_dia + (quente ? 5 : 0)) return log.push("piloto: limite diário atingido");
+  if (!(noPico || (quente && hora >= 6))) return;
+
+  // até 2 Reels em produção ao mesmo tempo (a montagem leva ~4 min)
+  const { count: emProducao } = await db
+    .from("reels")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["na_fila", "processando", "publicando"]);
+  if ((emProducao ?? 0) >= (quente ? 2 : 1)) return;
+
+  // intervalo mínimo entre publicações automáticas (curto para notícia quente)
+  const intervalo = quente ? Math.min(10, cfg.intervalo_min_minutos ?? 40) : cfg.intervalo_min_minutos ?? 40;
+  const { data: ultimo } = await db
+    .from("reels")
+    .select("publicado_em")
+    .eq("status", "publicado")
+    .order("publicado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ultimo?.publicado_em && Date.now() - Date.parse(ultimo.publicado_em) < intervalo * 60_000) return;
+
+  log.push(`piloto: ${quente ? "QUENTE " : ""}melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
 
   for (const t of candidatos) {
     let videoUrl: string | null = t.video_url;
