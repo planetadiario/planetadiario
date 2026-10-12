@@ -325,11 +325,11 @@ export async function atualizarMetricas(env: Bindings) {
   const desde = new Date(Date.now() - 30 * 86400_000).toISOString();
   const { data } = await db
     .from("reels")
-    .select("id, fb_video_id, ig_media_id")
+    .select("id, fb_video_id, ig_media_id, metricas")
     .eq("status", "publicado")
     .gte("publicado_em", desde)
     .order("metricas_em", { ascending: true, nullsFirst: true })
-    .limit(6); // ~8 chamadas por Reel; o plano grátis permite 50 por execução
+    .limit(9); // ~5 chamadas por Reel; o plano grátis permite 50 por execução
   const log: string[] = [];
   // seguidores do dia (meta de monetização)
   try {
@@ -342,10 +342,12 @@ export async function atualizarMetricas(env: Bindings) {
   }
   for (const r of data ?? []) {
     try {
-      const metricas = await metricasReel(env, r.fb_video_id, r.ig_media_id);
+      const metricas = await metricasReel(env, r.fb_video_id, r.ig_media_id, r.metricas);
       await db.from("reels").update({ metricas, metricas_em: new Date().toISOString() }).eq("id", r.id);
       log.push(`${r.id}: ${JSON.stringify(metricas)}`);
     } catch (e) {
+      // marca como visto mesmo com erro, para não travar a fila dos outros Reels
+      await db.from("reels").update({ metricas_em: new Date().toISOString() }).eq("id", r.id);
       log.push(`${r.id}: ERRO ${e instanceof Error ? e.message : e}`);
     }
   }

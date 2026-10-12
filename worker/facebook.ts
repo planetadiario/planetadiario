@@ -91,7 +91,12 @@ export async function publicarReelInstagram(env: Bindings, videoUrl: string, leg
 }
 
 /** Métricas do Reel no Facebook e no Instagram (insights quando o token permite) */
-export async function metricasReel(env: Bindings, fbVideoId: string | null, igMediaId: string | null) {
+export async function metricasReel(
+  env: Bindings,
+  fbVideoId: string | null,
+  igMediaId: string | null,
+  anteriores: Record<string, unknown> | null = null,
+) {
   const g = `https://graph.facebook.com/${env.FB_GRAPH_VERSION}`;
   const t = env.FB_PAGE_TOKEN;
   const m: Record<string, number | string> = {
@@ -100,28 +105,36 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
   const avisos: string[] = [];
 
   if (fbVideoId) {
-    const r = (await fbJson(
-      await fetch(`${g}/${fbVideoId}?fields=likes.summary(true).limit(0),comments.summary(true).limit(0)&access_token=${t}`),
-    )) as { likes?: { summary?: { total_count: number } }; comments?: { summary?: { total_count: number } } };
-    m.fb_curtidas = r.likes?.summary?.total_count ?? 0;
-    m.fb_comentarios = r.comments?.summary?.total_count ?? 0;
-    // uma métrica por chamada: a API recusa o pedido inteiro se uma delas não valer para Reels
-    const FB_METRICAS: Record<string, string> = {
-      blue_reels_play_count: "fb_views",
-      fb_reels_total_plays: "fb_views_total",
-      post_video_avg_time_watched: "fb_tempo_medio_ms",
-      post_video_followers: "fb_novos_seguidores",
-      post_video_view_time: "fb_tempo_total_ms", // minutos assistidos (meta de monetização)
-    };
-    for (const [metrica, campo] of Object.entries(FB_METRICAS)) {
-      try {
-        const ins = (await fbJson(await fetch(`${g}/${fbVideoId}/video_insights?metric=${metrica}&access_token=${t}`))) as {
-          data: { values: { value: number }[] }[];
-        };
-        if (ins.data?.[0]) m[campo] = Number(ins.data[0].values?.[0]?.value ?? 0);
-      } catch (e) {
-        avisos.push(`fb ${metrica}: ${e instanceof Error ? e.message.replace("Facebook: ", "") : e}`);
+    try {
+      const r = (await fbJson(
+        await fetch(`${g}/${fbVideoId}?fields=likes.summary(true).limit(0),comments.summary(true).limit(0)&access_token=${t}`),
+      )) as { likes?: { summary?: { total_count: number } }; comments?: { summary?: { total_count: number } } };
+      m.fb_curtidas = r.likes?.summary?.total_count ?? 0;
+      m.fb_comentarios = r.comments?.summary?.total_count ?? 0;
+      // todas as métricas do vídeo numa chamada só (sem filtro a API devolve as que valem para Reels)
+      const FB_METRICAS: Record<string, string> = {
+        blue_reels_play_count: "fb_views",
+        fb_reels_total_plays: "fb_views_total",
+        post_video_avg_time_watched: "fb_tempo_medio_ms",
+        post_video_followers: "fb_novos_seguidores",
+        post_video_view_time: "fb_tempo_total_ms", // minutos assistidos (meta de monetização)
+      };
+      const ins = (await fbJson(await fetch(`${g}/${fbVideoId}/video_insights?access_token=${t}`))) as {
+        data?: { name: string; values: { value: unknown }[] }[];
+      };
+      for (const d of ins.data ?? []) {
+        const campo = FB_METRICAS[d.name];
+        if (campo) m[campo] = Number(d.values?.[0]?.value ?? 0) || 0;
       }
+      // sem dados (vídeo de outra página ou ainda agendado): mantém os últimos números
+      for (const campo of Object.values(FB_METRICAS)) {
+        const antes = anteriores?.[campo];
+        if (m[campo] === undefined && typeof antes === "number") m[campo] = antes;
+      }
+    } catch (e) {
+      // vídeo de outra página (troca de página) ou apagado: mantém os últimos números do Facebook
+      for (const [k, v] of Object.entries(anteriores ?? {})) if (k.startsWith("fb_") && typeof v === "number") m[k] = v;
+      avisos.push(`fb: ${e instanceof Error ? e.message.replace("Facebook: ", "").slice(0, 120) : e}`);
     }
   }
   if (igMediaId) {
