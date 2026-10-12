@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import Icone from "./Icone";
 import Login from "./paginas/Login";
+import Audiencia from "./paginas/Audiencia";
 import Visao from "./paginas/Visao";
 import Radar from "./paginas/Radar";
 import Producao from "./paginas/Producao";
@@ -13,6 +14,7 @@ import FundadoresAdmin from "./paginas/Fundadores";
 
 const ABAS = [
   { id: "visao", nome: "Visão geral", icone: "visao" },
+  { id: "audiencia", nome: "Audiência", icone: "usuario" },
   { id: "radar", nome: "Radar", icone: "radar" },
   { id: "producao", nome: "Produção", icone: "producao" },
   { id: "novo", nome: "Novo Reel", icone: "novo" },
@@ -129,6 +131,7 @@ export default function App() {
 
       <main className="w-full px-4 py-6 md:px-6 2xl:px-10">
         {aba === "visao" && <Visao />}
+        {aba === "audiencia" && <Audiencia />}
         {aba === "radar" && <Radar irParaProducao={() => trocar("producao")} />}
         {aba === "producao" && <Producao />}
         {aba === "novo" && <NovoReel criado={() => trocar("producao")} />}

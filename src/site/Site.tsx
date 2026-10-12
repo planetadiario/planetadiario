@@ -9,6 +9,7 @@ import Assinar from "./Assinar";
 import Conta from "./Conta";
 import Busca from "./Busca";
 import Fundadores from "./Fundadores";
+import { registrarVisita } from "./visitas";
 import { Privacidade, Termos } from "./Legal";
 import { ColunaDireita, ColunaEsquerda } from "./Colunas";
 import { SeloFundador } from "./Fundadores";
@@ -37,6 +38,9 @@ export default function Site() {
   const [recolhida, setRecolhida] = useState(() => lerPreferencia("coluna") === "recolhida");
   const [termo, setTermo] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [buscaMovel, setBuscaMovel] = useState(false);
+
+  // audiência: conta a visita de cada página aberta
+  useEffect(() => registrarVisita(caminho), [caminho]);
 
   const partes = caminho.split("/").filter(Boolean);
   if (partes[0] === "reels") return <ModoReels leitor={leitor} inicio={partes[1]} />;
