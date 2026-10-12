@@ -57,7 +57,21 @@ def enviar_arquivo(caminho: str, arquivo: Path, tipo: str) -> str:
 
 # ---------- Download ----------
 
+def resolver_telegram(url: str) -> str:
+    """t.me/canal/123 → endereço direto do .mp4 (página de incorporação do post)."""
+    import re
+    r = requests.get(url.split("?")[0] + "?embed=1&mode=tme", headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+    r.raise_for_status()
+    m = re.search(r'<video[^>]+src="([^"]+)"', r.text)
+    if not m:
+        raise RuntimeError("Post do Telegram sem vídeo")
+    return m.group(1).replace("&amp;", "&")
+
+
 def baixar(url: str, pasta: Path) -> tuple[Path, dict]:
+    origem = url
+    if "://t.me/" in url:
+        url = resolver_telegram(url)
     opcoes = {
         "outtmpl": str(pasta / "origem.%(ext)s"),
         "format": "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b",
@@ -88,7 +102,7 @@ def baixar(url: str, pasta: Path) -> tuple[Path, dict]:
     meta = {
         "titulo": info.get("title"),
         "descricao": (info.get("description") or "")[:1500],
-        "autor": info.get("uploader") or info.get("channel") or info.get("uploader_id"),
+        "autor": info.get("uploader") or info.get("channel") or info.get("uploader_id") or (origem.split("/")[3] if "://t.me/" in origem else None),
         "plataforma": info.get("extractor_key"),
         "duracao": info.get("duration"),
         "data": info.get("upload_date"),

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Bindings, Tendencia } from "./env";
 import { buscarVideos, dailymotion, googleTrends, youtubeEmAlta } from "./coletores";
+import { bluesky, noticiasPais, telegram } from "./fontes-extras";
 import { analisarTendencias } from "./ia";
 import { dispararRender } from "./github";
 import { metricasReel } from "./facebook";
@@ -18,7 +19,14 @@ export interface Config {
   paises: string[];
   fontes_bloqueadas: string[];
   aprendizados?: { texto?: string };
+  telegram_canais?: string[];
+  intervalo_min_minutos?: number;
 }
+
+export const CANAIS_TELEGRAM_PADRAO = [
+  "Breaking911", "bnonews", "disclosetv", "insiderpaper", "wfwitness", "ClashReport", "WarMonitors",
+  "metropoles", "cnnbrasil", "g1noticias",
+];
 
 export async function lerConfig(db: SupabaseClient): Promise<Config> {
   const { data, error } = await db.from("config").select("chave, valor");
@@ -29,23 +37,50 @@ export async function lerConfig(db: SupabaseClient): Promise<Config> {
 const CANAIS_DM = ["sport", "animals", "fun", "tech", "news", "lifestyle", "auto", "music"];
 const MAX_DURACAO_AUTO = 180;
 
-/** Roda a cada 10 minutos: coleta, analisa com IA e (se ligado) produz Reels sozinho */
-export async function coletar(env: Bindings) {
+/**
+ * Roda a cada 5 minutos, alternando dois grupos de fontes (limite de 50 requisições
+ * por execução no plano grátis):
+ *  - rodada par:   Google Trends + YouTube em alta + Dailymotion (3 países em rodízio)
+ *  - rodada ímpar: Telegram (canais de última hora) + Google Notícias + Bluesky
+ * Depois analisa com IA e (se ligado) produz Reels sozinho.
+ */
+export async function coletar(env: Bindings, forcarGrupo?: "par" | "impar") {
   const db = supa(env);
   const cfg = await lerConfig(db);
   const log: string[] = [];
 
-  // Brasil em toda rodada; os outros países em rodízio (limite de requisições do plano grátis)
-  const rodada = Math.floor(Date.now() / 600_000);
+  // Brasil em toda rodada; os outros países em rodízio
+  const rodada = Math.floor(Date.now() / 300_000);
+  const meia = Math.floor(rodada / 2);
   const outros = cfg.paises.filter((p) => p !== "BR");
-  const paises = ["BR", ...new Set([outros[(rodada * 2) % outros.length], outros[(rodada * 2 + 1) % outros.length]])];
-  const canal = CANAIS_DM[rodada % CANAIS_DM.length];
+  const paises = ["BR", ...new Set([outros[(meia * 2) % outros.length], outros[(meia * 2 + 1) % outros.length]])];
+  const canal = CANAIS_DM[meia % CANAIS_DM.length];
 
   const tarefas: Promise<Tendencia[]>[] = [];
-  for (const p of paises) {
-    tarefas.push(googleTrends(p), dailymotion(p, "news"), youtubeEmAlta(env, p));
+  let grupo: string;
+  if (forcarGrupo ? forcarGrupo === "par" : rodada % 2 === 0) {
+    grupo = `trends/youtube/dailymotion ${paises.join(",")} (${canal})`;
+    for (const p of paises) tarefas.push(googleTrends(p), dailymotion(p, "news"), youtubeEmAlta(env, p));
+    tarefas.push(dailymotion("BR", canal), dailymotion("US", canal));
+  } else {
+    // 5 canais do Telegram por rodada, em rodízio
+    const canais = cfg.telegram_canais?.length ? cfg.telegram_canais : CANAIS_TELEGRAM_PADRAO;
+    const escolhidos = Array.from({ length: Math.min(5, canais.length) }, (_, i) => canais[(meia * 5 + i) % canais.length]);
+    grupo = `telegram ${[...new Set(escolhidos)].join(",")} + notícias ${paises.join(",")} + bluesky`;
+    for (const c of new Set(escolhidos)) tarefas.push(telegram(c));
+    // GDELT aceita 1 pedido a cada 5 s: países em fila
+    tarefas.push(
+      (async () => {
+        const todas: Tendencia[] = [];
+        for (const [i, p] of paises.entries()) {
+          if (i) await new Promise((r) => setTimeout(r, 5500));
+          todas.push(...(await noticiasPais(p).catch(() => [])));
+        }
+        return todas;
+      })(),
+    );
+    tarefas.push(bluesky(env.BLUESKY_USUARIO, env.BLUESKY_SENHA_APP));
   }
-  tarefas.push(dailymotion("BR", canal), dailymotion("US", canal));
 
   const resultados = await Promise.allSettled(tarefas);
   const bloqueadas = cfg.fontes_bloqueadas.map((f) => f.toLowerCase());
@@ -76,7 +111,7 @@ export async function coletar(env: Bindings) {
 
   if (cfg.publicacao_automatica) await pilotoAutomatico(env, db, cfg, log);
 
-  log.unshift(`coleta: ${novos.length} itens de ${paises.join(",")} (canal ${canal})`);
+  log.unshift(`coleta: ${novos.length} itens — ${grupo}`);
   console.log(log.join("\n"));
   return log;
 }
@@ -88,14 +123,22 @@ async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[
     .eq("analisado", false)
     .gte("detectado_em", new Date(Date.now() - 6 * 3600_000).toISOString())
     .order("detectado_em", { ascending: false })
-    .limit(80);
+    .limit(60);
   if (error) return log.push(`pendentes: ${error.message}`);
   if (!pendentes?.length) return;
 
   try {
     // dois lotes em paralelo para acompanhar o volume da coleta
-    const lotes = [pendentes.slice(0, 40), pendentes.slice(40)];
-    const analises = (await Promise.all(lotes.filter((l) => l.length).map((l) => analisarTendencias(env, l, aprendizados)))).flat();
+    // lotes pequenos, um de cada vez: cabem no tempo de resposta e no limite de pedidos do plano grátis
+    const analises: Awaited<ReturnType<typeof analisarTendencias>> = [];
+    for (let i = 0; i < pendentes.length; i += 15) {
+      try {
+        analises.push(...(await analisarTendencias(env, pendentes.slice(i, i + 15), aprendizados)));
+      } catch (e) {
+        log.push(`analise lote ${i / 15 + 1}: ${e instanceof Error ? e.message.slice(0, 120) : e}`);
+        break;
+      }
+    }
     const porId = new Map(analises.map((a) => [a.id, a]));
     const atualizados = pendentes
       .filter((t) => porId.has(t.id))
@@ -139,6 +182,17 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .in("status", ["na_fila", "processando", "publicando"]);
   if ((emProducao ?? 0) > 0) return;
 
+  // intervalo mínimo entre publicações automáticas
+  const intervalo = cfg.intervalo_min_minutos ?? 40;
+  const { data: ultimo } = await db
+    .from("reels")
+    .select("publicado_em")
+    .eq("status", "publicado")
+    .order("publicado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ultimo?.publicado_em && Date.now() - Date.parse(ultimo.publicado_em) < intervalo * 60_000) return;
+
   const desde = new Date(Date.now() - 12 * 3600_000).toISOString();
   const { data: candidatos } = await db
     .from("tendencias")
@@ -176,7 +230,8 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
       .select("id")
       .single();
     if (error) return log.push(`piloto: ${error.message}`);
-    await dispararRender(env, reel.id, true);
+    // fato grave de última hora: monta, mas espera a sua aprovação (risco de informação falsa)
+    await dispararRender(env, reel.id, t.categoria !== "urgente");
     return log.push(`piloto: reel ${reel.id} (${t.titulo_pt ?? t.titulo})`);
   }
 }

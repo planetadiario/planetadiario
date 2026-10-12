@@ -7,7 +7,7 @@ import { dispararRender } from "./github";
 import { paginaNoticia, site } from "./site";
 import { gerarAprendizados } from "./aprendizados";
 
-const CRON_METRICAS = "5,35 * * * *";
+const CRON_METRICAS = "2,32 * * * *";
 
 type App = { Bindings: Bindings; Variables: { email: string } };
 const app = new Hono<App>().basePath("/api");
@@ -42,6 +42,12 @@ app.post("/interno/apagar-facebook/:id", async (c) => {
   const corpo = await r.json();
   if (r.ok) await db.from("reels").update({ fb_video_id: null, fb_post_url: null }).eq("id", c.req.param("id"));
   return c.json({ ok: r.ok, corpo });
+});
+
+app.post("/interno/coletar", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  const g = c.req.query("grupo");
+  return c.json({ log: await coletar(c.env, g === "par" || g === "impar" ? g : undefined) });
 });
 
 app.post("/interno/metricas", async (c) => {

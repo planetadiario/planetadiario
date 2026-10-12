@@ -15,6 +15,8 @@ export interface Bindings {
   LYTEX_CLIENT_ID: string;
   LYTEX_CLIENT_SECRET: string;
   LYTEX_CALLBACK_SECRET?: string;
+  BLUESKY_USUARIO?: string;
+  BLUESKY_SENHA_APP?: string;
 }
 
 export interface Tendencia {

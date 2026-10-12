@@ -23,7 +23,11 @@ interface Cfg {
   assinatura_preco_centavos: number;
   acesso_antecipado_min: number;
   aprendizados: Aprendizados;
+  telegram_canais?: string[];
+  intervalo_min_minutos?: number;
 }
+
+const CANAIS_TELEGRAM_PADRAO = ["Breaking911", "bnonews", "disclosetv", "insiderpaper", "wfwitness", "ClashReport", "WarMonitors", "metropoles", "cnnbrasil", "g1noticias"];
 
 type Aba = "automacao" | "inteligencia" | "categorias" | "reel" | "fontes" | "site";
 
@@ -86,6 +90,8 @@ export default function Ajustes() {
           <section className="cartao flex flex-col gap-6 p-6">
             <Faixa rotulo="Nota mínima de viralização" valor={cfg.score_minimo_auto} min={50} max={95} passo={5} aoMudar={(v) => gravar("score_minimo_auto", v)} />
             <Faixa rotulo="Máximo de Reels por dia" valor={cfg.max_posts_dia} min={1} max={30} aoMudar={(v) => gravar("max_posts_dia", v)} />
+            <Faixa rotulo="Intervalo mínimo entre posts (minutos)" valor={cfg.intervalo_min_minutos ?? 40} min={10} max={180} passo={5} aoMudar={(v) => gravar("intervalo_min_minutos", v)} />
+            <p className="text-xs text-suave">Assuntos URGENTES são montados automaticamente, mas esperam a sua aprovação em Produção.</p>
           </section>
         </div>
       )}
@@ -132,6 +138,21 @@ export default function Ajustes() {
         <div className="grid gap-5 lg:grid-cols-2">
           <ListaEditavel titulo="Países monitorados" ajuda="Códigos separados por vírgula (BR, US, GB…)" valores={cfg.paises} salvar={(v) => gravar("paises", v.map((p) => p.toUpperCase()))} />
           <ListaEditavel titulo="Canais/autores bloqueados" ajuda="Vídeos desses autores nunca são usados" valores={cfg.fontes_bloqueadas} salvar={(v) => gravar("fontes_bloqueadas", v)} />
+          <ListaEditavel
+            titulo="Canais do Telegram monitorados"
+            ajuda="Nomes dos canais públicos (o que vem depois de t.me/), separados por vírgula"
+            valores={cfg.telegram_canais?.length ? cfg.telegram_canais : CANAIS_TELEGRAM_PADRAO}
+            salvar={(v) => gravar("telegram_canais", v)}
+          />
+          <section className="cartao p-6">
+            <h3 className="font-semibold">Fontes ativas</h3>
+            <p className="mb-3 text-sm text-suave">Coleta a cada 5 minutos, alternando dois grupos.</p>
+            <ul className="grid gap-2 text-sm sm:grid-cols-2">
+              {["Google Trends (12 países)", "YouTube em alta + busca", "Dailymotion", "Telegram (última hora)", "Google Notícias", "Bluesky (em alta)"].map((f) => (
+                <li key={f} className="flex items-center gap-2"><Icone nome="checkCirculo" className="size-4 text-emerald-500" />{f}</li>
+              ))}
+            </ul>
+          </section>
         </div>
       )}
 

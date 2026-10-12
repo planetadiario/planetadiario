@@ -84,6 +84,10 @@ export const FONTE: Record<string, string> = {
   google_trends: "Google Trends",
   youtube: "YouTube",
   dailymotion: "Dailymotion",
+  telegram: "Telegram",
+  google_news: "Google Notícias",
+  gdelt: "GDELT",
+  bluesky: "Bluesky",
   manual: "Manual",
 };
 
