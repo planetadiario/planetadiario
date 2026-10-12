@@ -1,0 +1,26 @@
+name: Tarefas agendadas
+
+# disparado pelo cron do Cloudflare (que só pode rodar ~30 s): aqui a rota interna
+# roda até o fim (análise da IA, Instagram, métricas)
+on:
+  workflow_dispatch:
+    inputs:
+      rota:
+        description: "rota interna (coletar?grupo=par, metricas, aprendizados, instagram-pendente)"
+        required: true
+
+concurrency:
+  group: tarefa-${{ inputs.rota }}
+  cancel-in-progress: false
+
+jobs:
+  tarefa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Executar
+        env:
+          ROTA: ${{ inputs.rota }}
+          INTERNAL_SECRET: ${{ secrets.INTERNAL_SECRET }}
+        run: |
+          curl -sS -m 840 -X POST -H "x-internal-secret: $INTERNAL_SECRET" "https://planetadiario.online/api/interno/$ROTA" | head -c 4000

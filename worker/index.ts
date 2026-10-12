@@ -3,7 +3,7 @@ import type { Bindings } from "./env";
 import { atualizarMetricas, coletar, supa } from "./coleta";
 import { buscarVideos } from "./coletores";
 import { apagarInstagram, publicarReel, publicarReelInstagram, publicarStoryFacebook } from "./facebook";
-import { dispararRender } from "./github";
+import { dispararRender, dispararTarefa } from "./github";
 import { paginaCategoria, paginaNoticia, site, sitemap } from "./site";
 import { gerarAprendizados } from "./aprendizados";
 
@@ -83,6 +83,16 @@ app.post("/interno/diagnostico-fb", async (c) => {
 app.post("/interno/metricas", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
   return c.json({ log: await atualizarMetricas(c.env) });
+});
+
+app.post("/interno/aprendizados", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  return c.json(await gerarAprendizados(c.env));
+});
+
+app.post("/interno/instagram-pendente", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  return c.json({ ok: true, resultado: await instagramPendente(c.env) });
 });
 
 // Site público (leitores)
@@ -329,16 +339,19 @@ export default {
     return app.fetch(req, env, ctx);
   },
   async scheduled(ctrl, env, ctx) {
-    if (ctrl.cron === CRON_INSTAGRAM) {
-      ctx.waitUntil(instagramPendente(env).then(() => undefined));
-      return;
-    }
-    if (ctrl.cron === CRON_METRICAS) {
+    // o cron só dispara; o GitHub Actions chama a rota interna, que pode levar minutos
+    const agora = new Date(ctrl.scheduledTime);
+    let rota = "coletar";
+    if (ctrl.cron === CRON_INSTAGRAM) rota = "instagram-pendente";
+    else if (ctrl.cron === CRON_METRICAS) {
       // uma vez por dia (6h05 em Brasília) a IA revisa o desempenho e atualiza os aprendizados
-      const agora = new Date(ctrl.scheduledTime);
-      const tarefa = agora.getUTCHours() === 9 && agora.getUTCMinutes() < 30 ? gerarAprendizados(env) : atualizarMetricas(env);
-      ctx.waitUntil(tarefa.then(() => undefined));
+      rota = agora.getUTCHours() === 9 && agora.getUTCMinutes() < 30 ? "aprendizados" : "metricas";
+    } else {
+      // mesma alternância de grupos da coleta direta
+      rota = `coletar?grupo=${Math.floor(agora.getTime() / 300_000) % 2 === 0 ? "par" : "impar"}`;
     }
-    else ctx.waitUntil(coletar(env).then(() => undefined));
+    ctx.waitUntil(
+      dispararTarefa(env, rota).catch((e) => console.log("dispatch falhou:", e instanceof Error ? e.message : e)),
+    );
   },
 } satisfies ExportedHandler<Bindings>;
