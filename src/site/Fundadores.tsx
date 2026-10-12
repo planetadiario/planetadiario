@@ -255,7 +255,11 @@ function Compra({ leitor, clube }: { leitor: Leitor | null | undefined; clube: C
       <button disabled={estado === "gerando" || leitor === undefined} className="rounded-full bg-marca py-3 font-semibold text-white disabled:opacity-60">
         {estado === "gerando" ? "Gerando PIX…" : `Ser fundador por ${clube ? reais(clube.preco_centavos) : "R$ 15,90"}`}
       </button>
-      <p className="text-center text-[11px] text-gray-500">Pagamento único. Não é participação societária nem investimento.</p>
+      <p className="text-center text-[11px] text-gray-500">
+        Pagamento único. Não é participação societária nem investimento. Ao continuar, você concorda com os{" "}
+        <a href="/termos" onClick={aoClicar("/termos")} className="underline">Termos</a> e a{" "}
+        <a href="/privacidade" onClick={aoClicar("/privacidade")} className="underline">Privacidade</a>.
+      </p>
     </form>
   );
 }

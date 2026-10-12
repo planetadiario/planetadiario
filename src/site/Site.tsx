@@ -9,6 +9,7 @@ import Assinar from "./Assinar";
 import Conta from "./Conta";
 import Busca from "./Busca";
 import Fundadores from "./Fundadores";
+import { Privacidade, Termos } from "./Legal";
 import { ColunaDireita, ColunaEsquerda } from "./Colunas";
 import { SeloFundador } from "./Fundadores";
 import { useInstalar } from "../pwa";
@@ -61,6 +62,8 @@ export default function Site() {
   if (partes[0] === "n" && partes[1]) pagina = <PaginaNoticia slug={partes[1]} leitor={leitor} />;
   else if (partes[0] === "assinar") pagina = <Assinar leitor={leitor} />;
   else if (partes[0] === "conta") pagina = <Conta leitor={leitor} />;
+  else if (partes[0] === "privacidade") pagina = <Privacidade />;
+  else if (partes[0] === "termos") pagina = <Termos />;
   else if (partes[0] === "fundadores") pagina = <Fundadores leitor={leitor} sub={partes[1]} />;
   else if (partes[0] === "busca") pagina = <Busca termo={new URLSearchParams(window.location.search).get("q") ?? ""} />;
   else pagina = <Inicio categoria={partes[0] === "c" ? partes[1] : undefined} leitor={leitor} />;
@@ -132,7 +135,10 @@ export default function Site() {
 
       <div className={`pt-[calc(3.5rem+env(safe-area-inset-top))] ${recolhida ? "lg:pl-[76px]" : "lg:pl-60"}`}>
         <div className="grid gap-6 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-          <main className="min-w-0">{pagina}</main>
+          <main className="min-w-0">
+            <AvisoRenovacao leitor={leitor} />
+            {pagina}
+          </main>
           <aside className="hidden xl:block">
             <div className="sticky top-[4.75rem] max-h-[calc(100dvh-6rem)] overflow-y-auto pb-6 [scrollbar-width:thin]">
               <ColunaDireita leitor={leitor} />
@@ -328,4 +334,20 @@ export function LogoGoogle() {
 
 export function sair() {
   return supabase.auth.signOut();
+}
+
+/** Aviso no topo quando a assinatura Pro vence em até 5 dias (PIX não renova sozinho) */
+function AvisoRenovacao({ leitor }: { leitor: Leitor | null | undefined }) {
+  if (!leitor?.assinante || !leitor.fimAssinatura) return null;
+  const dias = Math.ceil((Date.parse(leitor.fimAssinatura) - Date.now()) / 86400_000);
+  if (dias > 5) return null;
+  return (
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+      <span className="flex items-center gap-2">
+        <Icone nome="info" className="size-4 text-amber-500" />
+        Sua assinatura Pro vence {dias <= 0 ? "hoje" : dias === 1 ? "amanhã" : `em ${dias} dias`}. Renove para não perder os benefícios.
+      </span>
+      <a href="/assinar" onClick={aoClicar("/assinar")} className="rounded-full bg-amber-500 px-4 py-1.5 font-semibold text-black">Renovar</a>
+    </div>
+  );
 }

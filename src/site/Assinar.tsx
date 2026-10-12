@@ -114,7 +114,9 @@ export default function Assinar({ leitor }: { leitor: Leitor | null | undefined 
         )}
       </div>
       <p className="text-xs text-suave md:col-span-2">
-        A assinatura dura 30 dias a partir do pagamento e não renova sozinha: avisamos quando estiver perto de acabar.{" "}
+        A assinatura dura 30 dias a partir do pagamento e não renova sozinha: avisamos no site quando estiver perto de acabar. Ao assinar, você concorda com os{" "}
+        <a href="/termos" onClick={aoClicar("/termos")} className="underline">Termos de Uso</a> e a{" "}
+        <a href="/privacidade" onClick={aoClicar("/privacidade")} className="underline">Política de Privacidade</a>.{" "}
         <a href="/" onClick={aoClicar("/")} className="underline">Voltar às notícias</a>
       </p>
     </div>

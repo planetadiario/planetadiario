@@ -5,6 +5,7 @@ import { aoClicar, entrarComGoogle, nomeCategoria, paragrafosSite, quando, type 
 import { Avatar, LogoGoogle, SeloAssinante } from "./Site";
 import { ChamadaAssinatura, Selos } from "./Inicio";
 import { SeloFundador } from "./Fundadores";
+import Anuncio from "./Anuncio";
 
 export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: Leitor | null | undefined }) {
   const [n, setN] = useState<Noticia | null | undefined>(undefined);
@@ -70,6 +71,7 @@ export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: 
           </div>
         )}
 
+        <Anuncio leitor={leitor} onde="artigo" />
         <Compartilhar url={url} titulo={n.manchete} />
         {!!n.hashtags?.length && (
           <p className="mt-4 flex flex-wrap gap-2 text-sm text-globo">{n.hashtags.map((h) => <span key={h}>#{h}</span>)}</p>

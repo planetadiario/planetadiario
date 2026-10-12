@@ -294,7 +294,7 @@ ${(data ?? [])
   .join("\n")}
 </urlset>`;
   } else {
-    const fixas = ["/", "/reels", "/assinar", "/fundadores", "/fundadores/mural", ...Object.keys(CATEGORIAS).map((c) => `/c/${c}`)];
+    const fixas = ["/", "/reels", "/assinar", "/fundadores", "/fundadores/mural", "/termos", "/privacidade", ...Object.keys(CATEGORIAS).map((c) => `/c/${c}`)];
     xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${fixas.map((p) => `<url><loc>${o}${p}</loc><changefreq>hourly</changefreq></url>`).join("\n")}

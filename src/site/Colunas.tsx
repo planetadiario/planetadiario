@@ -146,6 +146,10 @@ export function ColunaEsquerda({ caminho, leitor, recolhida, aoNavegar }: Nav & 
         )}
       </Secao>
 
+      <p className="flex gap-3 px-3 pt-4 text-xs text-suave">
+        <a href="/termos" onClick={(e) => { aoClicar("/termos")(e); aoNavegar?.(); }} className="hover:text-texto">Termos de Uso</a>
+        <a href="/privacidade" onClick={(e) => { aoClicar("/privacidade")(e); aoNavegar?.(); }} className="hover:text-texto">Privacidade</a>
+      </p>
       <p className="px-3 py-4 text-xs leading-relaxed text-suave">
         © {new Date().getFullYear()} Planeta Diário
         <br />

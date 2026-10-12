@@ -31,6 +31,7 @@ interface Cfg {
   meta_posts_dia?: number;
   horarios_pico?: [number, number][];
   urgente_automatico?: boolean;
+  adsense?: { client: string; slot_home: string; slot_artigo: string };
 }
 
 const CANAIS_TELEGRAM_PADRAO = ["Breaking911", "bnonews", "disclosetv", "insiderpaper", "wfwitness", "ClashReport", "WarMonitors", "metropoles", "cnnbrasil", "g1noticias"];
@@ -208,6 +209,23 @@ export default function Ajustes() {
 
       {aba === "site" && (
         <div className="grid gap-5 lg:grid-cols-2">
+          <section className="cartao p-6 lg:col-span-2">
+            <h3 className="mb-1 font-semibold">Anúncios (Google AdSense)</h3>
+            <p className="mb-3 text-sm text-suave">Cole o código do editor (ca-pub-…) e os IDs dos blocos de anúncio. Assinantes Pro nunca veem anúncios. Vazio = sem anúncios.</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {(["client", "slot_home", "slot_artigo"] as const).map((k) => (
+                <label key={k} className="text-sm">
+                  <span className="mb-1 block text-suave">{k === "client" ? "Código do editor" : k === "slot_home" ? "Bloco da capa" : "Bloco da notícia"}</span>
+                  <input
+                    defaultValue={cfg.adsense?.[k] ?? ""}
+                    onBlur={(e) => gravar("adsense", { client: "", slot_home: "", slot_artigo: "", ...cfg.adsense, [k]: e.target.value.trim() })}
+                    placeholder={k === "client" ? "ca-pub-0000000000000000" : "0000000000"}
+                    className="w-full rounded-lg border border-borda bg-fundo px-3 py-2.5"
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
           <section className="cartao p-6">
             <h3 className="mb-1 font-semibold">Preço da assinatura Pro</h3>
             <p className="mb-3 text-sm text-suave">Valor mensal cobrado por PIX (Lytex).</p>

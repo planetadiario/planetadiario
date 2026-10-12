@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Icone from "../Icone";
+import Anuncio from "./Anuncio";
 import { aoClicar, buscarNoticias, CATEGORIAS, nomeCategoria, quando, resumoSite, type Leitor, type Noticia } from "./base";
 
 export default function Inicio({ categoria, leitor }: { categoria?: string; leitor: Leitor | null | undefined }) {
@@ -37,6 +38,8 @@ export default function Inicio({ categoria, leitor }: { categoria?: string; leit
         <>
           {/* em alta: primeiro, no topo */}
           <Carrossel titulo={categoria ? `Em alta em ${nomeCategoria(categoria)}` : "Em alta agora"} itens={itens.slice(0, 12)} />
+
+          <Anuncio leitor={leitor} onde="home" />
 
           {/* destaque + lista lateral */}
           <section className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -156,24 +159,33 @@ export function Selos({ n }: { n: Noticia }) {
 
 function Destaque({ n }: { n: Noticia }) {
   return (
-    <a href={`/n/${n.slug}`} onClick={aoClicar(`/n/${n.slug}`)} className="group grid overflow-hidden rounded-2xl bg-black text-white sm:grid-cols-[220px_1fr]">
-      <div className="relative aspect-[9/16] max-h-[65vh] w-full sm:max-h-none">
-        {n.thumb_url && <img src={n.thumb_url} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />}
+    <a
+      href={`/n/${n.slug}`}
+      onClick={aoClicar(`/n/${n.slug}`)}
+      className="group relative isolate grid min-h-[420px] overflow-hidden rounded-2xl bg-black text-white sm:grid-cols-[minmax(200px,36%)_1fr] lg:self-start"
+    >
+      {/* fundo: a própria capa, desfocada (sem área preta vazia) */}
+      {n.thumb_url && <img src={n.thumb_url} alt="" aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full scale-125 object-cover opacity-50 blur-3xl" />}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/30 via-black/60 to-black/85" />
+
+      <div className="relative aspect-[9/16] w-full sm:aspect-auto sm:h-full">
+        {n.thumb_url && <img src={n.thumb_url} alt="" className="absolute inset-0 h-full w-full object-contain transition duration-500 group-hover:scale-[1.02]" />}
         <span className="absolute inset-0 grid place-items-center">
           <span className="grid size-14 place-items-center rounded-full bg-white/20 backdrop-blur transition group-hover:bg-marca">
             <svg viewBox="0 0 24 24" className="ml-1 size-6 fill-white" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
           </span>
         </span>
       </div>
-      <div className="flex flex-col justify-end gap-3 p-6">
-        <div className="flex items-center gap-2 text-xs">
+
+      <div className="flex flex-col justify-center gap-4 p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded bg-marca px-2 py-0.5 font-bold uppercase">{nomeCategoria(n.categoria)}</span>
           <Selos n={n} />
-          <span className="text-white/60">{quando(n.site_publicado_em)}</span>
+          <span className="text-white/70">{quando(n.site_publicado_em)}</span>
         </div>
-        <h2 className="text-2xl font-bold leading-tight lg:text-[28px]">{n.manchete}</h2>
-        {n.legenda && <p className="line-clamp-3 text-white/75">{resumoSite(n.legenda)}</p>}
-        <span className="mt-1 flex items-center gap-1 text-sm font-semibold text-white/90 group-hover:text-white">
+        <h2 className="text-2xl font-bold leading-tight sm:text-3xl xl:text-4xl">{n.manchete}</h2>
+        {n.legenda && <p className="line-clamp-4 text-base text-white/80">{resumoSite(n.legenda)}</p>}
+        <span className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition group-hover:bg-marca group-hover:text-white">
           Ler a notícia <Icone nome="seta" className="size-4" />
         </span>
       </div>

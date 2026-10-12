@@ -260,6 +260,14 @@ async function instagramPendente(env: Bindings) {
   if (data?.[0]) await publicarInstagram(env, data[0].id);
 }
 
+/** ads.txt exigido pelo AdSense, gerado a partir do código cadastrado em Ajustes */
+async function adsTxt(env: Bindings) {
+  const { data } = await supa(env).from("config").select("valor").eq("chave", "adsense").maybeSingle();
+  const pub = String((data?.valor as { client?: string } | null)?.client ?? "").replace(/^ca-/, "");
+  const corpo = pub ? `google.com, ${pub}, DIRECT, f08c47fec0942fa0\n` : "";
+  return new Response(corpo, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
+}
+
 function slugify(texto: string, id: string) {
   const base = texto
     .normalize("NFD")
@@ -277,6 +285,7 @@ export default {
     if (caminho.startsWith("/n/")) return paginaNoticia(req, env);
     if (caminho.startsWith("/c/")) return paginaCategoria(req, env);
     if (caminho === "/sitemap.xml" || caminho === "/sitemap-noticias.xml") return sitemap(req, env);
+    if (caminho === "/ads.txt") return adsTxt(env);
     return app.fetch(req, env, ctx);
   },
   async scheduled(ctrl, env, ctx) {
