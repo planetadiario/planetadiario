@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Bindings } from "./env";
 import { supa } from "./coleta";
 import { consultarFatura, criarPix } from "./lytex";
+import { confirmarCompraBot } from "./telegram-bot";
 
 /** Rotas públicas do site (leitores logados com Google) */
 export const site = new Hono<{ Bindings: Bindings }>();
@@ -119,6 +120,11 @@ site.post("/lytex", async (c) => {
     if (!ass) {
       const { data: f } = await db.from("fundadores").select("id, status").eq("fatura_id", id).maybeSingle();
       if (f && f.status !== "ativo" && (await consultarFatura(c.env, id)).status?.toLowerCase() === "paid") await db.rpc("ativar_fundador", { p_id: f.id });
+      // compra feita pelo bot do Telegram
+      if (!f) {
+        const { data: b } = await db.from("bot_compras").select("id, status").eq("fatura_id", id).maybeSingle();
+        if (b && b.status !== "pago" && (await consultarFatura(c.env, id)).status?.toLowerCase() === "paid") await confirmarCompraBot(c.env, db, b.id);
+      }
     }
   } catch (e) {
     console.log("webhook lytex:", e instanceof Error ? e.message : e);

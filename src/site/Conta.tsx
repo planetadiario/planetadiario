@@ -244,6 +244,7 @@ function Assinatura({ leitor }: { leitor: Leitor }) {
       ) : (
         <div className="mb-6 max-w-md"><ChamadaAssinatura /></div>
       )}
+      <ResgatarCodigo />
       <h2 className="mb-2 font-semibold">Histórico</h2>
       {pagamentos.length === 0 ? (
         <p className="text-sm text-suave">Nenhum pagamento ainda.</p>
@@ -378,5 +379,42 @@ function Privacidade({ leitor }: { leitor: Leitor }) {
         {erro && <p className="mt-2 text-red-500">{erro}</p>}
       </Linha>
     </>
+  );
+}
+
+/** Código recebido no bot do Telegram: ativa o Pro ou o número de fundador nesta conta */
+function ResgatarCodigo() {
+  const [codigo, setCodigo] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  async function resgatar() {
+    setEnviando(true);
+    const { data, error } = await supabase.rpc("resgatar_codigo", { p_codigo: codigo });
+    setEnviando(false);
+    if (error) return setMsg({ ok: false, texto: error.message });
+    const r = data as { tipo: string; numero: number | null };
+    setMsg({ ok: true, texto: r.tipo === "pro" ? "Pro ativado por 30 dias! Recarregando…" : `Bem-vindo, fundador nº ${r.numero}! Recarregando…` });
+    setTimeout(() => location.reload(), 1500);
+  }
+
+  return (
+    <div className="cartao mb-6 p-5">
+      <p className="flex items-center gap-2 font-semibold"><Icone nome="enviar" className="size-4" /> Comprou pelo Telegram?</p>
+      <p className="mb-3 text-sm text-suave">Digite o código que o bot @PlanetaDiarioNews_bot te enviou para ativar nesta conta.</p>
+      <div className="flex flex-wrap gap-2">
+        <input
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+          placeholder="EX.: AB12CD34"
+          maxLength={12}
+          className="w-44 rounded-lg border border-borda bg-fundo px-3 py-2 font-mono tracking-wider"
+        />
+        <button onClick={resgatar} disabled={codigo.trim().length < 6 || enviando} className="rounded-lg bg-marca px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          {enviando ? "Ativando…" : "Ativar"}
+        </button>
+      </div>
+      {msg && <p className={`mt-2 text-sm ${msg.ok ? "text-emerald-500" : "text-red-500"}`}>{msg.texto}</p>}
+    </div>
   );
 }

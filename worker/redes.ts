@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Bindings } from "./env";
 import { supa } from "./coleta";
+import { BOT_USUARIO } from "./telegram-bot";
 
 /**
  * Redes extras: Telegram, Threads, YouTube Shorts e TikTok.
@@ -160,6 +161,15 @@ async function telegram(env: Bindings, r: Reel) {
   form.append("caption", legenda);
   form.append("parse_mode", "HTML");
   form.append("supports_streaming", "true");
+  form.append(
+    "reply_markup",
+    JSON.stringify({
+      inline_keyboard: [
+        [{ text: "📰 Ler no site", url: link }],
+        [{ text: "⚡ Receba antes de todo mundo (Pro)", url: `https://t.me/${BOT_USUARIO}?start=pro` }],
+      ],
+    }),
+  );
   form.append("width", "1080");
   form.append("height", "1920");
   form.append("video", new Blob([await baixarVideo(r.video_url)], { type: "video/mp4" }), "reel.mp4");

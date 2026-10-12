@@ -6,6 +6,7 @@ import { apagarInstagram, publicarReel, publicarReelInstagram, publicarStoryFace
 import { dispararRender, dispararTarefa } from "./github";
 import { paginaCategoria, paginaNoticia, site, sitemap } from "./site";
 import { gerarAprendizados } from "./aprendizados";
+import { alertasAntecipados, atualizacaoTelegram, configurarBot, segredoWebhook } from "./telegram-bot";
 import { REDES, concluirConexao, publicarPendente, situacaoRedes, urlConectar, type Rede } from "./redes";
 
 const CRON_METRICAS = "2,32 * * * *";
@@ -101,7 +102,26 @@ app.post("/interno/redes/:rede", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
   const rede = c.req.param("rede") as Rede;
   if (!REDES.includes(rede)) return c.json({ erro: "rede desconhecida" }, 404);
-  return c.json(await publicarPendente(c.env, rede));
+  // quem é Pro no bot recebe as notícias novas antes
+  const alertas = rede === "telegram" ? await alertasAntecipados(c.env).catch((e) => ({ erro: String(e) })) : undefined;
+  return c.json({ ...(await publicarPendente(c.env, rede)), alertas });
+});
+
+// bot do Telegram: configuração (webhook, comandos, descrição e mensagem fixada no canal)
+app.post("/interno/telegram-setup", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  return c.json(await configurarBot(c.env, c.req.query("fixar") === "1"));
+});
+
+// bot do Telegram: o Telegram chama aqui a cada mensagem (cabeçalho com o segredo)
+app.post("/telegram/webhook", async (c) => {
+  if (c.req.header("x-telegram-bot-api-secret-token") !== (await segredoWebhook(c.env))) return c.json({ ok: false }, 401);
+  try {
+    await atualizacaoTelegram(c.env, await c.req.json());
+  } catch (e) {
+    console.log("bot telegram:", e instanceof Error ? e.message : e);
+  }
+  return c.json({ ok: true });
 });
 
 // volta da autorização (Google, TikTok, Threads): o "state" assinado garante que partiu do painel
