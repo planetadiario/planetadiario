@@ -23,7 +23,7 @@ LINHA_X0, LINHA_X1 = 85, 1021
 # - instagram: tudo dentro da área segura (recorte 4:5 do feed e interface do Reel)
 LAYOUTS = {
     "facebook": {"pasta": "moldes", "logo_topo": 110, "pilula": (1500, 1570), "linha": (1533, 1537)},
-    "instagram": {"pasta": "moldes-ig", "logo_topo": 330, "pilula": (1236, 1306), "linha": (1269, 1273)},
+    "instagram": {"pasta": "moldes-ig", "logo_topo": 110, "pilula": (1236, 1306), "linha": (1269, 1273)},
 }
 PILULA_RAIO = 10
 PILULA_PAD = 14

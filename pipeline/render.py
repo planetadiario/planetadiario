@@ -19,7 +19,7 @@ LAYOUTS = {
     # layout original: logo no topo, faixa e manchete embaixo
     "facebook": {"caixa": (255, 1390), "texto": (1500, 1800), "margem": 60, "degrade": 1180, "linhas": 4, "fonte": (72, 42)},
     # área segura do Instagram: o feed recorta 4:5 (y 285–1635) e a interface do Reel cobre a base
-    "instagram": {"caixa": (450, 1150), "texto": (1236, 1545), "margem": 70, "degrade": 900, "linhas": 3, "fonte": (64, 38)},
+    "instagram": {"caixa": (255, 1150), "texto": (1236, 1545), "margem": 70, "degrade": 900, "linhas": 3, "fonte": (64, 38)},
 }
 COR_RODAPE = (255, 40, 40, 255)
 DURACAO_MAX = 90
