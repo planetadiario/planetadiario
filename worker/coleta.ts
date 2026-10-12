@@ -336,8 +336,10 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
       const videos = (await buscarVideos(env, busca)).filter(
         (v) => ((v.extra?.duracao as number) ?? 999) <= MAX_DURACAO_AUTO,
       );
-      videoUrl = videos[0]?.video_url ?? null;
-      autor = videos[0]?.extra?.autor ?? null;
+      const certo = await videoDoFato(env, `${t.titulo_pt ?? ""} ${t.titulo}`, videos);
+      videoUrl = certo?.video_url ?? null;
+      autor = certo?.extra?.autor ?? null;
+      if (!certo && videos.length) log.push(`piloto: nenhum vídeo é sobre "${t.titulo_pt ?? t.titulo}"`);
     }
     if (!videoUrl) continue;
     if ((recentes ?? []).some((r) => r.origem_url === videoUrl)) {
@@ -417,8 +419,8 @@ async function buscarVideosQuentes(env: Bindings, db: SupabaseClient, log: strin
   for (const t of pendentes) {
     const busca = String(t.extra?.busca ?? t.titulo);
     const videos = (await buscarVideos(env, busca, usarYoutube)).filter((v) => Number(v.extra?.duracao ?? 0) <= 240);
-    // YouTube primeiro (busca por relevância e vídeos curtos); depois Dailymotion
-    const melhor = videos.find((v) => v.fonte === "youtube") ?? videos[0];
+    // a IA confere qual vídeo é mesmo sobre o fato (a busca às vezes traz outro assunto)
+    const melhor = await videoDoFato(env, `${t.titulo_pt ?? ""} ${t.titulo}`, videos);
     await db
       .from("tendencias")
       .update({
@@ -450,4 +452,33 @@ function parecido(a: Set<string>, b: Set<string>) {
   for (const w of a) if (b.has(w)) comuns++;
   const menor = Math.min(a.size, b.size);
   return comuns >= 2 && comuns / menor >= 0.5;
+}
+
+/**
+ * Escolhe, entre os resultados da busca, o vídeo que mostra ESTE fato (ou nenhum).
+ * Ex.: notícia "Diddy levado ao hospital" não pode virar Reel com vídeo do Shyne ou do Bob Odenkirk.
+ */
+async function videoDoFato(env: Bindings, noticia: string, videos: Tendencia[]) {
+  const opcoes = videos.slice(0, 8);
+  if (!opcoes.length) return null;
+  try {
+    const r = await nvidiaJson<{ indice: number }>(
+      env,
+      "Você confere se vídeos correspondem a uma notícia. Responda só JSON.",
+      [
+        `Notícia: "${noticia.trim()}"`,
+        "",
+        "Vídeos encontrados:",
+        ...opcoes.map((v, i) => `${i}. ${v.titulo}${v.extra?.autor ? ` (${v.extra.autor})` : ""}`),
+        "",
+        "Qual vídeo mostra ESTE MESMO fato (mesma pessoa/lugar e mesmo acontecimento)? Prefira o mais direto. Se nenhum for sobre este fato, responda -1.",
+      ].join(String.fromCharCode(10)),
+      { type: "object", properties: { indice: { type: "integer" } }, required: ["indice"] },
+    );
+    return r.indice >= 0 && r.indice < opcoes.length ? opcoes[r.indice] : null;
+  } catch {
+    // sem a IA: só aceita se o título do vídeo tiver palavras do fato
+    const p = palavras(noticia);
+    return opcoes.find((v) => parecido(p, palavras(v.titulo))) ?? null;
+  }
 }
