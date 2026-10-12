@@ -8,84 +8,145 @@ import { ChamadaAssinatura } from "./Inicio";
 
 type Nav = { aoNavegar?: () => void };
 
-function Item({ href, rotulo, icone, ativo, recolhida, aoNavegar }: Nav & { href: string; rotulo: string; icone: string; ativo: boolean; recolhida: boolean }) {
-  const externo = href.startsWith("/painel");
-  return (
-    <a
-      href={href}
-      title={recolhida ? rotulo : undefined}
-      onClick={(e) => {
-        if (!externo) aoClicar(href)(e);
-        aoNavegar?.();
-      }}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${recolhida ? "justify-center px-0" : ""} ${
-        ativo ? "bg-marca/10 font-semibold text-marca" : "hover:bg-painel-2"
-      }`}
-    >
-      <Icone nome={icone} className="size-5 shrink-0" />
-      {!recolhida && <span className="truncate">{rotulo}</span>}
-    </a>
-  );
-}
-
-/** Coluna esquerda: navegação principal + categorias (recolhe para só ícones) */
-export function ColunaEsquerda({ caminho, leitor, recolhida, aoNavegar }: Nav & { caminho: string; leitor: Leitor | null | undefined; recolhida: boolean }) {
-  return (
-    <nav className="flex flex-col gap-0.5">
-      <Item href="/" rotulo="Início" icone="inicio" ativo={caminho === "/"} recolhida={recolhida} aoNavegar={aoNavegar} />
-      <Item href="/reels" rotulo="Reels" icone="reels" ativo={false} recolhida={recolhida} aoNavegar={aoNavegar} />
-      {leitor && <Item href="/conta" rotulo="Minha conta" icone="usuario" ativo={caminho === "/conta"} recolhida={recolhida} aoNavegar={aoNavegar} />}
-      {!leitor?.assinante && <Item href="/assinar" rotulo="Assine o Pro" icone="estrela" ativo={caminho === "/assinar"} recolhida={recolhida} aoNavegar={aoNavegar} />}
-      {leitor?.admin && <Item href="/painel" rotulo="Painel admin" icone="ajustes" ativo={false} recolhida={recolhida} aoNavegar={aoNavegar} />}
-
-      {!recolhida && (
-        <>
-          <p className="mb-1 mt-5 px-3 text-[11px] font-bold uppercase tracking-wider text-suave">Categorias</p>
-          {CATEGORIAS.map((c) => {
-            const href = `/c/${c.slug}`;
-            const ativo = caminho === href;
-            return (
-              <a
-                key={c.slug}
-                href={href}
-                onClick={(e) => {
-                  aoClicar(href)(e);
-                  aoNavegar?.();
-                }}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${ativo ? "bg-marca/10 font-semibold text-marca" : "text-suave hover:bg-painel-2 hover:text-texto"}`}
-              >
-                <span className={`size-1.5 rounded-full ${ativo ? "bg-marca" : "bg-suave/50"}`} />
-                {c.label}
-              </a>
-            );
-          })}
-        </>
-      )}
-    </nav>
-  );
-}
-
-const REDES = [
+export const REDES = [
   {
     nome: "Facebook",
     url: "https://www.facebook.com/1409105185617404",
-    cor: "bg-fb",
+    cor: "#1877F2",
     svg: "M24 12.07C24 5.41 18.63 0 12 0S0 5.41 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.88v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z",
   },
   {
     nome: "Instagram",
     url: "https://www.instagram.com/planetadiario.news",
-    cor: "bg-ig",
+    cor: "#E1306C",
     svg: "M12 2.16c3.2 0 3.58.01 4.85.07 3.25.15 4.77 1.69 4.92 4.92.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.15 3.23-1.66 4.77-4.92 4.92-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-3.26-.15-4.77-1.7-4.92-4.92C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85C2.38 3.92 3.9 2.38 7.15 2.23 8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 2.7.27.27 2.69.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.2 4.36 2.62 6.78 6.98 6.98C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c4.35-.2 6.78-2.62 6.98-6.98.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.2-4.35-2.62-6.78-6.98-6.98C15.67.01 15.26 0 12 0zm0 5.84a6.16 6.16 0 1 0 0 12.32 6.16 6.16 0 0 0 0-12.32zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.4-11.85a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88z",
   },
 ];
 
-/** Coluna direita: instalar app, mais lidas, assinatura, ranking e redes */
-export function ColunaDireita({ leitor, aoNavegar }: Nav & { leitor: Leitor | null | undefined }) {
-  const [lidas, setLidas] = useState<{ slug: string; manchete: string; categoria: string }[]>([]);
-  const [ranking, setRanking] = useState<{ nome: string; avatar: string | null; pontos: number; assinante: boolean }[]>([]);
+function Linha({ href, rotulo, icone, ativo, aoNavegar, externo, children }: Nav & { href: string; rotulo: string; icone?: string; ativo?: boolean; externo?: boolean; children?: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target={externo ? "_blank" : undefined}
+      rel={externo ? "noreferrer" : undefined}
+      onClick={(e) => {
+        if (!externo && !href.startsWith("/painel")) aoClicar(href)(e);
+        aoNavegar?.();
+      }}
+      className={`flex h-10 items-center gap-5 rounded-lg px-3 text-sm ${ativo ? "bg-painel-2 font-semibold" : "hover:bg-painel-2"}`}
+    >
+      {children ?? (icone && <Icone nome={icone} className="size-[22px] shrink-0" preenchido={false} />)}
+      <span className="truncate">{rotulo}</span>
+    </a>
+  );
+}
+
+function Secao({ titulo, children, seta }: { titulo?: string; children: React.ReactNode; seta?: boolean }) {
+  return (
+    <div className="border-b border-borda py-3 last:border-0">
+      {titulo && (
+        <p className="flex items-center gap-1 px-3 pb-1 pt-1 text-base font-semibold">
+          {titulo} {seta && <Icone nome="direita" className="size-4" />}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/** Menu esquerdo no estilo YouTube; recolhido vira a "mini guia" só com ícones */
+export function ColunaEsquerda({ caminho, leitor, recolhida, aoNavegar }: Nav & { caminho: string; leitor: Leitor | null | undefined; recolhida: boolean }) {
+  const [todas, setTodas] = useState(false);
   const instalar = useInstalar();
-  const [dicaIos, setDicaIos] = useState(false);
+
+  if (recolhida)
+    return (
+      <nav className="flex flex-col gap-1">
+        {[
+          { href: "/", rotulo: "Início", icone: "inicio" },
+          { href: "/reels", rotulo: "Reels", icone: "reels" },
+          { href: "/assinar", rotulo: "Pro", icone: "estrela" },
+          { href: leitor ? "/conta" : "/assinar", rotulo: "Você", icone: "usuario" },
+        ].map((i) => (
+          <a
+            key={i.rotulo}
+            href={i.href}
+            onClick={aoClicar(i.href)}
+            className={`flex flex-col items-center gap-1.5 rounded-lg py-4 text-[10px] ${caminho === i.href ? "font-semibold" : ""} hover:bg-painel-2`}
+          >
+            <Icone nome={i.icone} className="size-[22px]" />
+            {i.rotulo}
+          </a>
+        ))}
+      </nav>
+    );
+
+  const categorias = todas ? CATEGORIAS : CATEGORIAS.slice(0, 7);
+
+  return (
+    <nav className="px-3">
+      <Secao>
+        <Linha href="/" rotulo="Início" icone="inicio" ativo={caminho === "/"} aoNavegar={aoNavegar} />
+        <Linha href="/reels" rotulo="Reels" icone="reels" aoNavegar={aoNavegar} />
+        <Linha href="/c/urgente" rotulo="Urgente" icone="sirene" ativo={caminho === "/c/urgente"} aoNavegar={aoNavegar} />
+      </Secao>
+
+      <Secao titulo="Você" seta>
+        {leitor ? (
+          <>
+            <Linha href="/conta" rotulo="Minha conta" ativo={caminho === "/conta"} aoNavegar={aoNavegar}>
+              <Avatar nome={leitor.nome} url={leitor.avatar} tamanho="size-6" />
+            </Linha>
+            <Linha href="/conta" rotulo={`${leitor.pontos} pontos`} icone="trofeu" aoNavegar={aoNavegar} />
+            <Linha href="/assinar" rotulo={leitor.assinante ? "Assinatura Pro ativa" : "Assinar o Pro"} icone="estrela" ativo={caminho === "/assinar"} aoNavegar={aoNavegar} />
+            {leitor.admin && <Linha href="/painel" rotulo="Painel admin" icone="ajustes" aoNavegar={aoNavegar} />}
+          </>
+        ) : (
+          <p className="px-3 py-1 text-sm text-suave">Entre para comentar, curtir e ganhar pontos.</p>
+        )}
+      </Secao>
+
+      <Secao titulo="Explorar">
+        {categorias.map((c) => (
+          <Linha key={c.slug} href={`/c/${c.slug}`} rotulo={c.label} icone={c.icone} ativo={caminho === `/c/${c.slug}`} aoNavegar={aoNavegar} />
+        ))}
+        <button onClick={() => setTodas(!todas)} className="flex h-10 w-full items-center gap-5 rounded-lg px-3 text-sm hover:bg-painel-2">
+          <Icone nome={todas ? "cima" : "baixo"} className="size-[22px]" />
+          {todas ? "Mostrar menos" : "Mostrar mais"}
+        </button>
+      </Secao>
+
+      <Secao titulo="Mais do Planeta Diário">
+        {!leitor?.assinante && (
+          <Linha href="/assinar" rotulo="Planeta Diário Pro" aoNavegar={aoNavegar}>
+            <span className="grid size-[22px] place-items-center rounded-md bg-marca text-white"><Icone nome="estrela" className="size-3.5" /></span>
+          </Linha>
+        )}
+        {REDES.map((r) => (
+          <Linha key={r.nome} href={r.url} rotulo={r.nome} externo>
+            <svg viewBox="0 0 24 24" className="size-[22px] shrink-0" style={{ fill: r.cor }} aria-hidden="true"><path d={r.svg} /></svg>
+          </Linha>
+        ))}
+        {instalar && instalar.tipo === "prompt" && (
+          <button onClick={() => instalar.instalar()} className="flex h-10 w-full items-center gap-5 rounded-lg px-3 text-sm hover:bg-painel-2">
+            <Icone nome="instalar" className="size-[22px]" /> Instalar o app
+          </button>
+        )}
+      </Secao>
+
+      <p className="px-3 py-4 text-xs leading-relaxed text-suave">
+        © {new Date().getFullYear()} Planeta Diário
+        <br />
+        Tudo o que acontece no mundo, em vídeo.
+      </p>
+    </nav>
+  );
+}
+
+/** Coluna direita: mais lidas, assinatura e ranking */
+export function ColunaDireita({ leitor, aoNavegar }: Nav & { leitor: Leitor | null | undefined }) {
+  const [lidas, setLidas] = useState<{ slug: string; manchete: string; categoria: string; thumb_url: string | null }[]>([]);
+  const [ranking, setRanking] = useState<{ nome: string; avatar: string | null; pontos: number; assinante: boolean }[]>([]);
 
   useEffect(() => {
     supabase.rpc("mais_lidas", { p_limite: 5 }).then(({ data }) => setLidas(data ?? []));
@@ -94,24 +155,6 @@ export function ColunaDireita({ leitor, aoNavegar }: Nav & { leitor: Leitor | nu
 
   return (
     <div className="flex flex-col gap-5">
-      {instalar && (
-        <div className="cartao flex items-center gap-3 p-4">
-          <img src="/icone-192.png" alt="" className="size-11 rounded-xl" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">App Planeta Diário</p>
-            <p className="text-xs text-suave">{dicaIos ? "Toque em Compartilhar e depois em “Adicionar à Tela de Início”." : "Instale e abra como um app."}</p>
-          </div>
-          {!dicaIos && (
-            <button
-              onClick={() => (instalar.tipo === "ios" ? setDicaIos(true) : instalar.instalar())}
-              className="flex items-center gap-1.5 rounded-full bg-marca px-3 py-1.5 text-xs font-semibold text-white"
-            >
-              <Icone nome="instalar" className="size-3.5" /> Instalar
-            </button>
-          )}
-        </div>
-      )}
-
       {lidas.length > 0 && (
         <section className="cartao p-4">
           <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-suave">Mais lidas da semana</h3>
@@ -124,13 +167,14 @@ export function ColunaDireita({ leitor, aoNavegar }: Nav & { leitor: Leitor | nu
                     aoClicar(`/n/${n.slug}`)(e);
                     aoNavegar?.();
                   }}
-                  className="group flex gap-3"
+                  className="group flex items-center gap-3"
                 >
-                  <span className="w-5 shrink-0 text-lg font-bold leading-none text-marca">{i + 1}</span>
-                  <span className="min-w-0">
+                  <span className="w-4 shrink-0 text-lg font-bold leading-none text-marca">{i + 1}</span>
+                  <span className="min-w-0 flex-1">
                     <span className="block text-[10px] font-bold uppercase text-suave">{nomeCategoria(n.categoria)}</span>
                     <span className="line-clamp-2 text-sm font-medium leading-snug group-hover:underline">{n.manchete}</span>
                   </span>
+                  {n.thumb_url && <img src={n.thumb_url} alt="" className="h-14 w-8 shrink-0 rounded object-cover" />}
                 </a>
               </li>
             ))}
@@ -158,18 +202,6 @@ export function ColunaDireita({ leitor, aoNavegar }: Nav & { leitor: Leitor | nu
           </ol>
         </section>
       )}
-
-      <section className="cartao p-4">
-        <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-suave">Siga o Planeta Diário</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {REDES.map((r) => (
-            <a key={r.nome} href={r.url} target="_blank" rel="noreferrer" className={`${r.cor} flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold text-white`}>
-              <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden="true"><path d={r.svg} /></svg>
-              {r.nome}
-            </a>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

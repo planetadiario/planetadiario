@@ -29,7 +29,18 @@ Você vai gerar:
    - se houver autor/canal original, inclua "🎥 Créditos: <autor>".
    Não coloque hashtags dentro da legenda.
 3. artigo: texto da notícia para o site, com 2 a 4 parágrafos curtos (separados por linha em branco), em tom jornalístico, explicando o que aconteceu com os fatos disponíveis. Sem título, sem emoji, sem hashtag, sem inventar.
-4. hashtags: de 5 a 8, sem o símbolo #, sem espaços, misturando termos amplos e específicos do assunto, e sempre incluindo "planetadiario"."""
+4. hashtags: de 5 a 8, sem o símbolo #, sem espaços, misturando termos amplos e específicos do assunto, e sempre incluindo "planetadiario".
+5. categoria: a que melhor descreve o ASSUNTO do vídeo (vira a faixa vermelha do molde). Escolha pelo tema, não pela origem:
+   ciência e espaço → "ciencia"; animais → "animais"; clima/desastres naturais → "natureza"; tecnologia/IA → "tecnologia";
+   futebol e outros esportes → "esportes"; celebridades → "famosos"; crimes/segurança → "policia"; saúde → "saude";
+   dinheiro/mercado → "economia"; fato grave de última hora → "urgente"; fato do Brasil sem tema específico → "noticias";
+   fato internacional sem tema específico → "mundo"; vídeo inusitado que viralizou → "viral"; história tocante → "emocionante";
+   engraçado → "humor"; fato curioso → "curiosidades"."""
+
+CATEGORIAS = [
+    "noticias", "urgente", "mundo", "esportes", "famosos", "curiosidades", "viral", "emocionante",
+    "humor", "animais", "natureza", "ciencia", "tecnologia", "saude", "economia", "policia",
+]
 
 ESQUEMA = {
     "type": "object",
@@ -38,20 +49,29 @@ ESQUEMA = {
         "legenda": {"type": "string"},
         "artigo": {"type": "string"},
         "hashtags": {"type": "array", "items": {"type": "string"}},
+        "categoria": {"type": "string", "enum": CATEGORIAS},
     },
-    "required": ["manchete", "legenda", "artigo", "hashtags"],
+    "required": ["manchete", "legenda", "artigo", "hashtags", "categoria"],
     "additionalProperties": False,
 }
 
 
-def _nvidia(modelo: str, usuario: str) -> dict:
+def sistema(aprendizados: str = "") -> str:
+    """Prompt base + aprendizados do desempenho recente da página (auto-correção)."""
+    if not aprendizados:
+        return SISTEMA
+    return (SISTEMA + "\n\nAprendizados do desempenho recente da página (siga-os ao escrever, "
+            "sem nunca sacrificar a veracidade):\n" + aprendizados)
+
+
+def _nvidia(modelo: str, usuario: str, prompt: str) -> dict:
     r = requests.post(
         "https://integrate.api.nvidia.com/v1/chat/completions",
         headers={"Authorization": f"Bearer {os.environ['NVIDIA_API_KEY']}"},
         json={
             "model": modelo, "max_tokens": 8000, "temperature": 0.6,
             "messages": [
-                {"role": "system", "content": SISTEMA + "\n\nResponda APENAS com JSON válido neste esquema:\n" + json.dumps(ESQUEMA)},
+                {"role": "system", "content": prompt + "\n\nResponda APENAS com JSON válido neste esquema:\n" + json.dumps(ESQUEMA)},
                 {"role": "user", "content": usuario},
             ],
         },
@@ -65,10 +85,13 @@ def _nvidia(modelo: str, usuario: str) -> dict:
     return json.loads(m.group(0))
 
 
-def gerar_textos(contexto: dict) -> dict:
+def gerar_textos(contexto: dict, aprendizados: str = "") -> dict:
     modelo = os.environ.get("IA_MODELO", "moonshotai/kimi-k3")
     usuario = "Informações sobre o vídeo:\n" + json.dumps(contexto, ensure_ascii=False, indent=2)
-    dados = _claude(modelo, usuario) if modelo.startswith("claude") else _nvidia(modelo, usuario)
+    prompt = sistema(aprendizados)
+    dados = _claude(modelo, usuario, prompt) if modelo.startswith("claude") else _nvidia(modelo, usuario, prompt)
+    if dados.get("categoria") not in CATEGORIAS:
+        dados["categoria"] = None
     dados["manchete"] = dados["manchete"].strip().rstrip(".")[:120]
     dados["hashtags"] = [h.lstrip("#").replace(" ", "") for h in dados["hashtags"] if h.strip()][:8]
     if "planetadiario" not in [h.lower() for h in dados["hashtags"]]:
@@ -76,7 +99,7 @@ def gerar_textos(contexto: dict) -> dict:
     return dados
 
 
-def _claude(modelo: str, usuario: str) -> dict:
+def _claude(modelo: str, usuario: str, prompt: str) -> dict:
     client = anthropic.Anthropic()
     resposta = client.beta.messages.create(
         model=modelo,
@@ -84,7 +107,7 @@ def _claude(modelo: str, usuario: str) -> dict:
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",
         output_config={"effort": "medium", "format": {"type": "json_schema", "schema": ESQUEMA}},
-        system=SISTEMA,
+        system=prompt,
         messages=[{
             "role": "user",
             "content": usuario,

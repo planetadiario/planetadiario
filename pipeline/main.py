@@ -137,7 +137,13 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             "pais": tend.get("pais"),
         }
         print("✍️  escrevendo textos")
-        textos = gerar_textos(contexto)
+        cfg_apr = db_get("config", "chave=eq.aprendizados", "valor")
+        aprendizados = (cfg_apr[0]["valor"] or {}).get("texto", "") if cfg_apr else ""
+        textos = gerar_textos(contexto, aprendizados)
+        # categoria: a IA confirma pelo assunto, a menos que tenha sido escolhida a dedo
+        if reel.get("categoria_auto", True) and textos.get("categoria") and textos["categoria"] != reel["categoria"]:
+            print(f"🏷️  categoria: {reel['categoria']} → {textos['categoria']}")
+            reel["categoria"] = textos["categoria"]
 
         cfg = db_get("config", "chave=eq.rodape", "valor")
         rodape = cfg[0]["valor"] if cfg else ""
@@ -160,6 +166,7 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             "manchete": textos["manchete"],
             "legenda": textos["legenda"],
             "artigo": textos.get("artigo"),
+            "categoria": reel["categoria"],
             "hashtags": textos["hashtags"],
             "video_path": f"{BUCKET}/{reel_id}.mp4",
             "video_url": url_video,

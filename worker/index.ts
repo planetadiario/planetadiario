@@ -5,8 +5,9 @@ import { buscarVideos } from "./coletores";
 import { apagarInstagram, publicarReel, publicarReelInstagram } from "./facebook";
 import { dispararRender } from "./github";
 import { paginaNoticia, site } from "./site";
+import { gerarAprendizados } from "./aprendizados";
 
-const CRON_METRICAS = "5 * * * *";
+const CRON_METRICAS = "5,35 * * * *";
 
 type App = { Bindings: Bindings; Variables: { email: string } };
 const app = new Hono<App>().basePath("/api");
@@ -32,6 +33,22 @@ app.post("/interno/apagar-instagram/:id", async (c) => {
   return c.json({ ok: true, r });
 });
 
+app.post("/interno/apagar-facebook/:id", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  const db = supa(c.env);
+  const { data: reel } = await db.from("reels").select("fb_video_id").eq("id", c.req.param("id")).single();
+  if (!reel?.fb_video_id) return c.json({ erro: "sem post no Facebook" }, 404);
+  const r = await fetch(`https://graph.facebook.com/${c.env.FB_GRAPH_VERSION}/${reel.fb_video_id}?access_token=${c.env.FB_PAGE_TOKEN}`, { method: "DELETE" });
+  const corpo = await r.json();
+  if (r.ok) await db.from("reels").update({ fb_video_id: null, fb_post_url: null }).eq("id", c.req.param("id"));
+  return c.json({ ok: r.ok, corpo });
+});
+
+app.post("/interno/metricas", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  return c.json({ log: await atualizarMetricas(c.env) });
+});
+
 // Site público (leitores)
 app.route("/site", site);
 
@@ -50,6 +67,8 @@ app.use("*", async (c, next) => {
 });
 
 app.post("/coletar", async (c) => c.json({ log: await coletar(c.env) }));
+
+app.post("/aprendizados", async (c) => c.json(await gerarAprendizados(c.env)));
 
 app.get("/buscar-videos", async (c) => {
   const q = c.req.query("q")?.trim();
@@ -73,6 +92,8 @@ app.post("/reels", async (c) => {
     .insert({
       origem_url: body.origem_url,
       categoria: body.categoria ?? "noticias",
+      // sem categoria escolhida a dedo, a IA decide pelo assunto do vídeo
+      categoria_auto: !body.categoria || !!body.tendencia_id,
       tendencia_id: body.tendencia_id ?? null,
       origem_titulo: body.origem_titulo ?? null,
       origem_autor: body.origem_autor ?? null,
@@ -124,9 +145,12 @@ async function publicar(env: Bindings, id: string) {
 
   // Instagram (se houver conta profissional vinculada à página); falha aqui não desfaz o Facebook
   let igUrl: string | null = reel.ig_post_url;
-  if (!reel.ig_media_id) {
+  if (!reel.ig_media_id && !reel.video_ig_url) {
+    // nunca posta no Instagram a versão do Facebook: falta a versão na área segura
+    await db.from("reels").update({ erro: "Instagram: falta a versão do Instagram; clique em Refazer e publique de novo" }).eq("id", id);
+  } else if (!reel.ig_media_id) {
     try {
-      const ig = await publicarReelInstagram(env, reel.video_ig_url ?? reel.video_url, descricao);
+      const ig = await publicarReelInstagram(env, reel.video_ig_url, descricao);
       if (ig) {
         igUrl = ig.url;
         await db.from("reels").update({ ig_media_id: ig.mediaId, ig_post_url: ig.url }).eq("id", id);
@@ -169,7 +193,12 @@ export default {
     return app.fetch(req, env, ctx);
   },
   async scheduled(ctrl, env, ctx) {
-    if (ctrl.cron === CRON_METRICAS) ctx.waitUntil(atualizarMetricas(env));
+    if (ctrl.cron === CRON_METRICAS) {
+      // uma vez por dia (6h05 em Brasília) a IA revisa o desempenho e atualiza os aprendizados
+      const agora = new Date(ctrl.scheduledTime);
+      const tarefa = agora.getUTCHours() === 9 && agora.getUTCMinutes() < 30 ? gerarAprendizados(env) : atualizarMetricas(env);
+      ctx.waitUntil(tarefa.then(() => undefined));
+    }
     else ctx.waitUntil(coletar(env).then(() => undefined));
   },
 } satisfies ExportedHandler<Bindings>;

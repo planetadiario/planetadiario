@@ -45,13 +45,41 @@ const P: Record<string, string> = {
   instalar: "M12 3v12M7 10l5 5 5-5M5 21h14",
   link: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
   estrela: "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z",
+  // categorias
+  jornal: "M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2M18 14h-8M15 18h-5M10 6h8v4h-8z",
+  sirene: "M7 18v-6a5 5 0 1 1 10 0v6M5 21a1 1 0 0 1-1-1v-1a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1zM21 12h1M18.5 4.5 18 5M2 12h1M12 2v1M4.93 4.93l.71.71",
+  bola: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 7l4.5 3.3-1.7 5.3H9.2l-1.7-5.3zM12 2v5M21.5 9.3l-5 1M2.5 9.3l5 1M18 20l-3.2-4.4M6 20l3.2-4.4",
+  lampada: "M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14",
+  pata: "M11 3a2 2 0 1 0 0 4a2 2 0 1 0 0-4M18 7a2 2 0 1 0 0 4a2 2 0 1 0 0-4M20 15a2 2 0 1 0 0 4a2 2 0 1 0 0-4M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.05Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z",
+  folha: "M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10ZM2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12",
+  frasco: "M9 3h6M10 9V3M14 9V3M10 9 4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9M6.5 15h11",
+  cpu: "M4 4h16v16H4zM9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3",
+  pulso: "M22 12h-4l-3 9L9 3l-3 9H2",
+  grafico: "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
+  escudo: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  sorriso: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01",
+  // ações
+  compartilhar: "M15 5l6 6-6 6M21 11H9a6 6 0 0 0-6 6v2",
+  mais: "M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM19 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM5 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
+  fecharPainel: "M3 3h18v18H3zM15 3v18M8 9l3 3-3 3",
+  abrirPainel: "M3 3h18v18H3zM15 3v18M10 15l-3-3 3-3",
+  salvo: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
 };
 
 export type NomeIcone = keyof typeof P;
 
-export default function Icone({ nome, className = "size-5" }: { nome: NomeIcone | string; className?: string }) {
+export default function Icone({ nome, className = "size-5", preenchido = false }: { nome: NomeIcone | string; className?: string; preenchido?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill={preenchido ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
       <path d={P[nome] ?? ""} />
     </svg>
   );

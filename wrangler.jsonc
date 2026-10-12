@@ -15,7 +15,7 @@
     { "pattern": "www.planetadiario.online/*", "zone_name": "planetadiario.online" }
   ],
   // Coleta de tendências a cada 10 minutos; métricas dos posts de hora em hora
-  "triggers": { "crons": ["*/10 * * * *", "5 * * * *"] },
+  "triggers": { "crons": ["*/10 * * * *", "5,35 * * * *"] },
   "observability": { "enabled": true },
   "workers_dev": true,
   "preview_urls": false,

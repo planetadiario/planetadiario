@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Icone from "../Icone";
-import { aoClicar, buscarNoticias, navegar, nomeCategoria, paragrafosSite, quando, resumoSite, type Leitor, type Noticia } from "./base";
+import { aoClicar, buscarInteracoes, buscarNoticias, compartilhar, curtir, entrarComGoogle, navegar, nomeCategoria, numeroCompacto, paragrafosSite, quando, resumoSite, type Interacao, type Leitor, type Noticia } from "./base";
 import { Selos } from "./Inicio";
 import { Comentarios } from "./PaginaNoticia";
 
@@ -14,6 +14,8 @@ export default function ModoReels({ leitor, inicio }: { leitor: Leitor | null | 
   const [atual, setAtual] = useState(0);
   const [som, setSom] = useState(false);
   const [folha, setFolha] = useState(false);
+  const [painel, setPainel] = useState(true);
+  const [inter, setInter] = useState<Record<string, Interacao>>({});
   const lista = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,6 +23,7 @@ export default function ModoReels({ leitor, inicio }: { leitor: Leitor | null | 
     buscarNoticias(undefined, undefined, 40).then((n) => {
       const comVideo = n.filter((x) => x.video_url);
       setItens(comVideo);
+      buscarInteracoes(comVideo.map((x) => x.id)).then(setInter);
       const i = inicio ? comVideo.findIndex((x) => x.slug === inicio) : -1;
       if (i > 0) requestAnimationFrame(() => lista.current?.children[i]?.scrollIntoView());
     });
@@ -43,13 +46,38 @@ export default function ModoReels({ leitor, inicio }: { leitor: Leitor | null | 
 
   const n = itens[atual];
 
+  async function alternarCurtida(item: Noticia) {
+    if (!leitor) return entrarComGoogle();
+    const antes = inter[item.id] ?? { id: item.id, curtidas: 0, comentarios: 0, compartilhamentos: 0, curti: false };
+    const curti = !antes.curti;
+    setInter({ ...inter, [item.id]: { ...antes, curti, curtidas: antes.curtidas + (curti ? 1 : -1) } });
+    await curtir(item.id).catch(() => setInter((i) => ({ ...i, [item.id]: antes })));
+  }
+  async function enviar(item: Noticia) {
+    const antes = inter[item.id];
+    await compartilhar(item);
+    if (antes) setInter((i) => ({ ...i, [item.id]: { ...antes, compartilhamentos: antes.compartilhamentos + 1 } }));
+  }
+  function comentar() {
+    if (window.matchMedia("(min-width: 1024px)").matches) setPainel(true);
+    else setFolha(true);
+  }
+
   return (
     <div className="fixed inset-0 z-30 flex bg-black text-white">
       {/* vídeos */}
       <div className="relative min-w-0 flex-1">
         <div ref={lista} className="h-full snap-y snap-mandatory overflow-y-scroll [scrollbar-width:none]">
           {itens.map((item, i) => (
-            <ItemReel key={item.id} n={item} som={som} ativo={i === atual} aoVer={() => setAtual(i)} abrirFolha={() => setFolha(true)} />
+            <ItemReel
+              key={item.id}
+              n={item}
+              som={som}
+              ativo={i === atual}
+              aoVer={() => setAtual(i)}
+              inter={inter[item.id]}
+              acoes={{ curtir: () => alternarCurtida(item), comentar, enviar: () => enviar(item), detalhes: () => setFolha(true) }}
+            />
           ))}
           {itens.length === 0 && <p className="grid h-full place-items-center text-white/60">Carregando…</p>}
         </div>
@@ -58,13 +86,16 @@ export default function ModoReels({ leitor, inicio }: { leitor: Leitor | null | 
           <a href="/" onClick={aoClicar("/")} className="pointer-events-auto flex items-center gap-1 rounded-full bg-black/40 py-1.5 pl-2 pr-3 text-sm backdrop-blur">
             <Icone nome="esquerda" className="size-4" /> Planeta Diário
           </a>
-          <button
-            onClick={() => setSom(!som)}
-            aria-label={som ? "Desativar som" : "Ativar som"}
-            className="pointer-events-auto grid size-10 place-items-center rounded-full bg-black/40 backdrop-blur"
-          >
-            <Icone nome={som ? "som" : "mudo"} />
-          </button>
+          <div className="pointer-events-auto flex gap-2">
+            <button onClick={() => setSom(!som)} aria-label={som ? "Desativar som" : "Ativar som"} className="grid size-10 place-items-center rounded-full bg-black/40 backdrop-blur">
+              <Icone nome={som ? "som" : "mudo"} />
+            </button>
+            {!painel && n && (
+              <button onClick={() => setPainel(true)} aria-label="Abrir painel" className="hidden size-10 place-items-center rounded-full bg-black/40 backdrop-blur lg:grid">
+                <Icone nome="abrirPainel" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* navegação por setas (desktop) */}
@@ -79,9 +110,9 @@ export default function ModoReels({ leitor, inicio }: { leitor: Leitor | null | 
       </div>
 
       {/* painel lateral (desktop) */}
-      {n && (
+      {n && painel && (
         <aside className="hidden w-[400px] shrink-0 border-l border-borda bg-painel text-texto lg:flex">
-          <PainelReel n={n} leitor={leitor} />
+          <PainelReel n={n} leitor={leitor} esconder={() => setPainel(false)} />
         </aside>
       )}
 
@@ -99,20 +130,25 @@ export default function ModoReels({ leitor, inicio }: { leitor: Leitor | null | 
   );
 }
 
-function PainelReel({ n, leitor, fechar }: { n: Noticia; leitor: Leitor | null | undefined; fechar?: () => void }) {
+function PainelReel({ n, leitor, fechar, esconder }: { n: Noticia; leitor: Leitor | null | undefined; fechar?: () => void; esconder?: () => void }) {
   const [aberto, setAberto] = useState(false);
   const paragrafos = paragrafosSite(n.artigo ?? n.legenda ?? "");
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
       <div className="flex items-start gap-3 border-b border-borda p-4">
-        <img src="/icone-192.png" alt="" className="size-10 rounded-full" />
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-painel-2"><img src="/globo.png" alt="" className="size-7 object-contain" /></span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Planeta Diário</p>
           <p className="flex items-center gap-1.5 text-xs text-suave">
             <span className="font-bold uppercase text-marca">{nomeCategoria(n.categoria)}</span> · {quando(n.site_publicado_em)}
           </p>
         </div>
+        {esconder && (
+          <button onClick={esconder} aria-label="Esconder painel" title="Esconder painel" className="grid size-9 place-items-center rounded-full hover:bg-painel-2">
+            <Icone nome="fecharPainel" />
+          </button>
+        )}
         {fechar && (
           <button onClick={fechar} aria-label="Fechar" className="grid size-9 place-items-center rounded-full hover:bg-painel-2">
             <Icone nome="fechar" />
@@ -181,9 +217,23 @@ function Compartilhar({ n }: { n: Noticia }) {
   );
 }
 
-function ItemReel({ n, som, ativo, aoVer, abrirFolha }: { n: Noticia; som: boolean; ativo: boolean; aoVer: () => void; abrirFolha: () => void }) {
+type Acoes = { curtir: () => void; comentar: () => void; enviar: () => void; detalhes: () => void };
+
+function BotaoAcao({ icone, rotulo, onClick, ativo }: { icone: string; rotulo: string; onClick: () => void; ativo?: boolean }) {
+  return (
+    <button onClick={onClick} className="flex flex-col items-center gap-1 text-xs font-medium">
+      <span className={`grid size-12 place-items-center rounded-full backdrop-blur transition hover:bg-white/25 ${ativo ? "bg-white text-marca" : "bg-white/15"}`}>
+        <Icone nome={icone} preenchido={ativo} />
+      </span>
+      {rotulo}
+    </button>
+  );
+}
+
+function ItemReel({ n, som, ativo, aoVer, inter, acoes }: { n: Noticia; som: boolean; ativo: boolean; aoVer: () => void; inter?: Interacao; acoes: Acoes }) {
   const ref = useRef<HTMLVideoElement>(null);
   const caixa = useRef<HTMLElement>(null);
+  const [menu, setMenu] = useState(false);
 
   useEffect(() => {
     const el = caixa.current;
@@ -208,50 +258,57 @@ function ItemReel({ n, som, ativo, aoVer, abrirFolha }: { n: Noticia; som: boole
   }, [som]);
 
   return (
-    <section ref={caixa} className="relative flex h-full snap-start snap-always items-center justify-center">
-      <video
-        ref={ref}
-        src={n.video_url ?? undefined}
-        poster={n.thumb_url ?? undefined}
-        loop
-        playsInline
-        muted
-        preload="metadata"
-        onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())}
-        className="h-full max-h-dvh w-auto max-w-full object-contain"
-      />
-      {/* sobreposição só no celular (no desktop o painel lateral mostra tudo) */}
-      <div className="absolute bottom-0 left-0 right-16 p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] lg:hidden">
-        <div className="mb-2 flex items-center gap-2 text-xs">
-          <span className="rounded bg-marca px-2 py-0.5 font-bold uppercase">{nomeCategoria(n.categoria)}</span>
-          <Selos n={n} />
+    <section ref={caixa} className="relative flex h-full snap-start snap-always items-end justify-center gap-3 lg:py-4">
+      <div className="relative h-full lg:overflow-hidden lg:rounded-xl">
+        <video
+          ref={ref}
+          src={n.video_url ?? undefined}
+          poster={n.thumb_url ?? undefined}
+          loop
+          playsInline
+          muted
+          preload="metadata"
+          onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())}
+          className="h-full max-h-dvh w-auto max-w-[100vw] object-contain"
+        />
+        {/* legenda curta sobre o vídeo (celular) */}
+        <div className="absolute bottom-0 left-0 right-16 p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] lg:hidden">
+          <div className="mb-2 flex items-center gap-2 text-xs">
+            <span className="rounded bg-marca px-2 py-0.5 font-bold uppercase">{nomeCategoria(n.categoria)}</span>
+            <Selos n={n} />
+          </div>
+          {n.legenda && (
+            <button onClick={acoes.detalhes} className="line-clamp-2 text-left text-sm text-white/90">
+              {resumoSite(n.legenda)}
+            </button>
+          )}
         </div>
-        {n.legenda && (
-          <button onClick={abrirFolha} className="line-clamp-2 text-left text-sm text-white/90">
-            {resumoSite(n.legenda)}
-          </button>
-        )}
       </div>
-      <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-3 flex flex-col items-center gap-5 text-xs lg:hidden">
-        <button onClick={abrirFolha} className="flex flex-col items-center gap-1">
-          <span className="grid size-11 place-items-center rounded-full bg-white/15 backdrop-blur"><Icone nome="comentario" /></span>
-          {n.comentarios ?? 0}
-        </button>
-        <button
-          onClick={() => {
-            const url = `${window.location.origin}/n/${n.slug}`;
-            if (navigator.share) navigator.share({ title: n.manchete, url }).catch(() => {});
-            else navigator.clipboard.writeText(url);
-          }}
-          className="flex flex-col items-center gap-1"
-        >
-          <span className="grid size-11 place-items-center rounded-full bg-white/15 backdrop-blur"><Icone nome="enviar" /></span>
-          Enviar
-        </button>
-        <button onClick={abrirFolha} className="flex flex-col items-center gap-1">
-          <span className="grid size-11 place-items-center rounded-full bg-white/15 backdrop-blur"><Icone nome="info" /></span>
-          Detalhes
-        </button>
+
+      {/* ações: sobre o vídeo no celular, ao lado no desktop (estilo Facebook) */}
+      <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-3 flex flex-col items-center gap-4 lg:static lg:mb-2">
+        <BotaoAcao icone="curtida" rotulo={numeroCompacto(inter?.curtidas ?? 0)} onClick={acoes.curtir} ativo={inter?.curti} />
+        <BotaoAcao icone="comentario" rotulo={numeroCompacto(inter?.comentarios ?? n.comentarios ?? 0)} onClick={acoes.comentar} />
+        <BotaoAcao icone="compartilhar" rotulo={numeroCompacto(inter?.compartilhamentos ?? 0)} onClick={acoes.enviar} />
+        <div className="relative">
+          <BotaoAcao icone="mais" rotulo="" onClick={() => setMenu(!menu)} />
+          {menu && (
+            <div className="absolute bottom-full right-0 mb-2 w-44 overflow-hidden rounded-xl bg-painel text-sm text-texto shadow-xl">
+              <button onClick={() => navegar(`/n/${n.slug}`)} className="flex w-full items-center gap-3 px-4 py-3 hover:bg-painel-2">
+                <Icone nome="jornal" className="size-4" /> Abrir matéria
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/n/${n.slug}`);
+                  setMenu(false);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-3 hover:bg-painel-2"
+              >
+                <Icone nome="link" className="size-4" /> Copiar link
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

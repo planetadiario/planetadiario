@@ -52,23 +52,23 @@ export interface Noticia {
   ig_post_url?: string | null;
 }
 
-export const CATEGORIAS: { slug: string; label: string }[] = [
-  { slug: "noticias", label: "Brasil" },
-  { slug: "urgente", label: "Urgente" },
-  { slug: "mundo", label: "Mundo" },
-  { slug: "esportes", label: "Esportes" },
-  { slug: "famosos", label: "Famosos" },
-  { slug: "viral", label: "Viral" },
-  { slug: "curiosidades", label: "Curiosidades" },
-  { slug: "emocionante", label: "Emocionante" },
-  { slug: "animais", label: "Animais" },
-  { slug: "natureza", label: "Natureza" },
-  { slug: "ciencia", label: "Ciência" },
-  { slug: "tecnologia", label: "Tecnologia" },
-  { slug: "saude", label: "Saúde" },
-  { slug: "economia", label: "Economia" },
-  { slug: "policia", label: "Polícia" },
-  { slug: "humor", label: "Humor" },
+export const CATEGORIAS: { slug: string; label: string; icone: string }[] = [
+  { slug: "noticias", label: "Brasil", icone: "jornal" },
+  { slug: "urgente", label: "Urgente", icone: "sirene" },
+  { slug: "mundo", label: "Mundo", icone: "globo" },
+  { slug: "esportes", label: "Esportes", icone: "bola" },
+  { slug: "famosos", label: "Famosos", icone: "estrela" },
+  { slug: "viral", label: "Viral", icone: "fogo" },
+  { slug: "curiosidades", label: "Curiosidades", icone: "lampada" },
+  { slug: "emocionante", label: "Emocionante", icone: "coracao" },
+  { slug: "animais", label: "Animais", icone: "pata" },
+  { slug: "natureza", label: "Natureza", icone: "folha" },
+  { slug: "ciencia", label: "Ciência", icone: "frasco" },
+  { slug: "tecnologia", label: "Tecnologia", icone: "cpu" },
+  { slug: "saude", label: "Saúde", icone: "pulso" },
+  { slug: "economia", label: "Economia", icone: "grafico" },
+  { slug: "policia", label: "Polícia", icone: "escudo" },
+  { slug: "humor", label: "Humor", icone: "sorriso" },
 ];
 export const nomeCategoria = (s: string) => CATEGORIAS.find((c) => c.slug === s)?.label ?? s;
 
@@ -167,3 +167,43 @@ export function paragrafosSite(texto: string) {
 
 /** Primeira linha da legenda, sem emojis */
 export const resumoSite = (legenda: string) => semEmoji(legenda.split("\n")[0]);
+
+// ---------- Interações (curtir, comentar, compartilhar) ----------
+
+export interface Interacao {
+  id: string;
+  curtidas: number;
+  comentarios: number;
+  compartilhamentos: number;
+  curti: boolean;
+}
+
+export async function buscarInteracoes(ids: string[]) {
+  if (!ids.length) return {} as Record<string, Interacao>;
+  const { data } = await supabase.rpc("interacoes", { p_ids: ids });
+  return Object.fromEntries(((data ?? []) as Interacao[]).map((i) => [i.id, i]));
+}
+
+export async function curtir(id: string) {
+  const { data, error } = await supabase.rpc("alternar_curtida", { p_id: id });
+  if (error) throw error;
+  return data as boolean;
+}
+
+/** Abre o compartilhamento nativo (celular) ou copia o link, e conta o compartilhamento */
+export async function compartilhar(n: { id: string; slug: string; manchete: string }) {
+  const url = `${window.location.origin}/n/${n.slug}`;
+  supabase.rpc("registrar_compartilhamento", { p_id: n.id }).then(() => {});
+  if (navigator.share) {
+    await navigator.share({ title: n.manchete, url }).catch(() => {});
+    return "compartilhado";
+  }
+  await navigator.clipboard.writeText(url);
+  return "copiado";
+}
+
+export function numeroCompacto(n: number) {
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace(".0", "")} mi`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1).replace(".0", "")} mil`;
+  return String(n);
+}

@@ -49,7 +49,8 @@ export interface Analise {
 }
 
 /** Classifica e pontua um lote de tendências com o Claude */
-export async function analisarTendencias(env: Bindings, lote: Tendencia[]): Promise<Analise[]> {
+export async function analisarTendencias(env: Bindings, lote: Tendencia[], aprendizados = ""): Promise<Analise[]> {
+  const sistema = aprendizados ? `${SISTEMA}${String.fromCharCode(10, 10)}Aprendizados do desempenho recente da página (use para pontuar):${String.fromCharCode(10)}${aprendizados}` : SISTEMA;
   if (!lote.length) return [];
   const entrada = lote.map((t) => ({
     id: t.id,
@@ -64,7 +65,7 @@ export async function analisarTendencias(env: Bindings, lote: Tendencia[]): Prom
   }));
 
   if (!env.IA_MODELO.startsWith("claude")) {
-    const { itens } = await nvidiaJson<{ itens: Analise[] }>(env, SISTEMA, JSON.stringify(entrada), ESQUEMA);
+    const { itens } = await nvidiaJson<{ itens: Analise[] }>(env, sistema, JSON.stringify(entrada), ESQUEMA);
     return normalizar(itens);
   }
 
@@ -75,7 +76,7 @@ export async function analisarTendencias(env: Bindings, lote: Tendencia[]): Prom
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
-    system: SISTEMA,
+    system: sistema,
     messages: [{ role: "user", content: JSON.stringify(entrada) }],
   });
 
@@ -93,7 +94,7 @@ function normalizar(itens: Analise[]): Analise[] {
 }
 
 /** Modelos abertos via NVIDIA (API compatível com OpenAI) */
-async function nvidiaJson<T>(env: Bindings, sistema: string, usuario: string, esquema: object): Promise<T> {
+export async function nvidiaJson<T>(env: Bindings, sistema: string, usuario: string, esquema: object): Promise<T> {
   const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.NVIDIA_API_KEY}`, "Content-Type": "application/json" },

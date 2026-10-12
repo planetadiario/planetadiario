@@ -7,6 +7,7 @@ import PaginaNoticia from "./PaginaNoticia";
 import ModoReels from "./ModoReels";
 import Assinar from "./Assinar";
 import Conta from "./Conta";
+import Busca from "./Busca";
 import { ColunaDireita, ColunaEsquerda } from "./Colunas";
 
 function lerPreferencia(chave: string) {
@@ -30,6 +31,8 @@ export default function Site() {
   const [, setTema] = useState(0);
   const [gaveta, setGaveta] = useState(false);
   const [recolhida, setRecolhida] = useState(() => lerPreferencia("coluna") === "recolhida");
+  const [termo, setTermo] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
+  const [buscaMovel, setBuscaMovel] = useState(false);
 
   const partes = caminho.split("/").filter(Boolean);
   if (partes[0] === "reels") return <ModoReels leitor={leitor} inicio={partes[1]} />;
@@ -44,20 +47,44 @@ export default function Site() {
     gravarPreferencia("coluna", recolhida ? "aberta" : "recolhida");
   }
 
+  function buscar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!termo.trim()) return;
+    setBuscaMovel(false);
+    navegar(`/busca?q=${encodeURIComponent(termo.trim())}`);
+  }
+
   let pagina: React.ReactNode;
   if (partes[0] === "n" && partes[1]) pagina = <PaginaNoticia slug={partes[1]} leitor={leitor} />;
   else if (partes[0] === "assinar") pagina = <Assinar leitor={leitor} />;
   else if (partes[0] === "conta") pagina = <Conta leitor={leitor} />;
+  else if (partes[0] === "busca") pagina = <Busca termo={new URLSearchParams(window.location.search).get("q") ?? ""} />;
   else pagina = <Inicio categoria={partes[0] === "c" ? partes[1] : undefined} leitor={leitor} />;
+
+  const formBusca = (classe: string) => (
+    <form onSubmit={buscar} className={`flex items-center ${classe}`} role="search">
+      <input
+        value={termo}
+        onChange={(e) => setTermo(e.target.value)}
+        placeholder="Pesquisar notícias"
+        aria-label="Pesquisar notícias"
+        className="h-10 min-w-0 flex-1 rounded-l-full border border-borda bg-fundo px-4 text-sm outline-none focus:border-globo"
+      />
+      <button aria-label="Pesquisar" className="grid h-10 w-16 place-items-center rounded-r-full border border-l-0 border-borda bg-painel-2 hover:bg-borda">
+        <Icone nome="busca" className="size-5" />
+      </button>
+    </form>
+  );
 
   return (
     <div className="min-h-dvh pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0">
-      <header className="sticky top-0 z-20 border-b border-borda bg-fundo/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
+      {/* cabeçalho fixo */}
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-borda bg-fundo/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+        <div className="flex h-14 items-center gap-3 px-3 sm:px-4">
           <button
             onClick={alternarColuna}
             aria-label={recolhida ? "Expandir menu" : "Recolher menu"}
-            className="hidden size-9 place-items-center rounded-full text-suave hover:bg-painel-2 hover:text-texto lg:grid"
+            className="hidden size-10 place-items-center rounded-full hover:bg-painel-2 lg:grid"
           >
             <Icone nome="menu" />
           </button>
@@ -65,7 +92,13 @@ export default function Site() {
             <img src="/logo-claro.png" alt="Planeta Diário" className="h-8 dark:hidden" />
             <img src="/logo.png" alt="Planeta Diário" className="hidden h-8 dark:block" />
           </a>
-          <div className="ml-auto flex items-center gap-1.5">
+
+          {formBusca("mx-auto hidden w-full max-w-xl md:flex")}
+
+          <div className="ml-auto flex items-center gap-1.5 md:ml-0">
+            <button onClick={() => setBuscaMovel(true)} aria-label="Pesquisar" className="grid size-9 place-items-center rounded-full hover:bg-painel-2 md:hidden">
+              <Icone nome="busca" className="size-5" />
+            </button>
             <button onClick={alternarTema} aria-label="Alternar tema" className="grid size-9 place-items-center rounded-full text-suave hover:bg-painel-2 hover:text-texto">
               <Icone nome="lua" className="size-[18px] dark:hidden" />
               <Icone nome="sol" className="hidden size-[18px] dark:block" />
@@ -76,15 +109,25 @@ export default function Site() {
             <BotaoConta leitor={leitor} />
           </div>
         </div>
+        {buscaMovel && (
+          <div className="flex items-center gap-2 border-t border-borda px-3 py-2 md:hidden">
+            <button onClick={() => setBuscaMovel(false)} aria-label="Fechar busca" className="grid size-9 place-items-center rounded-full hover:bg-painel-2">
+              <Icone nome="esquerda" />
+            </button>
+            {formBusca("flex-1")}
+          </div>
+        )}
       </header>
 
-      <div className="flex">
-        {/* coluna esquerda recolhível (desktop) */}
-        <aside className={`sticky top-14 hidden h-[calc(100dvh-3.5rem)] shrink-0 overflow-y-auto border-r border-borda px-2 py-4 transition-[width] [scrollbar-width:thin] lg:block ${recolhida ? "w-[72px]" : "w-60"}`}>
-          <ColunaEsquerda caminho={caminho} leitor={leitor} recolhida={recolhida} />
-        </aside>
+      {/* menu esquerdo fixo (só o conteúdo rola) */}
+      <aside
+        className={`fixed bottom-0 left-0 top-14 z-20 hidden overflow-y-auto bg-fundo pt-[env(safe-area-inset-top)] [scrollbar-width:thin] lg:block ${recolhida ? "w-[76px] px-1" : "w-60"}`}
+      >
+        <ColunaEsquerda caminho={caminho} leitor={leitor} recolhida={recolhida} />
+      </aside>
 
-        <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-8 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className={`pt-[calc(3.5rem+env(safe-area-inset-top))] ${recolhida ? "lg:pl-[76px]" : "lg:pl-60"}`}>
+        <div className="grid gap-6 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_330px]">
           <main className="min-w-0">{pagina}</main>
           <aside className="hidden xl:block">
             <div className="sticky top-[4.75rem] max-h-[calc(100dvh-6rem)] overflow-y-auto pb-6 [scrollbar-width:thin]">
@@ -93,13 +136,6 @@ export default function Site() {
           </aside>
         </div>
       </div>
-
-      <footer className="hidden border-t border-borda lg:block">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-suave">
-          <p>© {new Date().getFullYear()} Planeta Diário — tudo o que acontece no mundo, em vídeo.</p>
-          <a href="/assinar" onClick={aoClicar("/assinar")} className="font-medium text-marca">Seja assinante</a>
-        </div>
-      </footer>
 
       {/* barra inferior estilo app (celular/tablet) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-borda bg-fundo/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">

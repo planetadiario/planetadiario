@@ -67,17 +67,39 @@ export async function publicarReelInstagram(env: Bindings, videoUrl: string, leg
   return { mediaId: pub.id, url: link.permalink ?? null };
 }
 
-/** Curtidas e comentários do Reel no Facebook e no Instagram */
+/** Métricas do Reel no Facebook e no Instagram (insights quando o token permite) */
 export async function metricasReel(env: Bindings, fbVideoId: string | null, igMediaId: string | null) {
   const g = `https://graph.facebook.com/${env.FB_GRAPH_VERSION}`;
   const t = env.FB_PAGE_TOKEN;
-  const m = { fb_curtidas: 0, fb_comentarios: 0, ig_curtidas: 0, ig_comentarios: 0 };
+  const m: Record<string, number | string> = {
+    fb_curtidas: 0, fb_comentarios: 0, ig_curtidas: 0, ig_comentarios: 0,
+  };
+  const avisos: string[] = [];
+
   if (fbVideoId) {
     const r = (await fbJson(
       await fetch(`${g}/${fbVideoId}?fields=likes.summary(true).limit(0),comments.summary(true).limit(0)&access_token=${t}`),
     )) as { likes?: { summary?: { total_count: number } }; comments?: { summary?: { total_count: number } } };
     m.fb_curtidas = r.likes?.summary?.total_count ?? 0;
     m.fb_comentarios = r.comments?.summary?.total_count ?? 0;
+    // uma métrica por chamada: a API recusa o pedido inteiro se uma delas não valer para Reels
+    const FB_METRICAS: Record<string, string> = {
+      blue_reels_play_count: "fb_views",
+      fb_reels_total_plays: "fb_views_total",
+      post_impressions_unique: "fb_alcance",
+      post_video_avg_time_watched: "fb_tempo_medio_ms",
+      post_video_followers: "fb_novos_seguidores",
+    };
+    for (const [metrica, campo] of Object.entries(FB_METRICAS)) {
+      try {
+        const ins = (await fbJson(await fetch(`${g}/${fbVideoId}/video_insights?metric=${metrica}&access_token=${t}`))) as {
+          data: { values: { value: number }[] }[];
+        };
+        if (ins.data?.[0]) m[campo] = Number(ins.data[0].values?.[0]?.value ?? 0);
+      } catch (e) {
+        avisos.push(`fb ${metrica}: ${e instanceof Error ? e.message.replace("Facebook: ", "") : e}`);
+      }
+    }
   }
   if (igMediaId) {
     const r = (await fbJson(await fetch(`${g}/${igMediaId}?fields=like_count,comments_count&access_token=${t}`))) as {
@@ -86,7 +108,23 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
     };
     m.ig_curtidas = r.like_count ?? 0;
     m.ig_comentarios = r.comments_count ?? 0;
+    try {
+      const ins = (await fbJson(
+        await fetch(`${g}/${igMediaId}/insights?metric=views,reach,saved,shares,ig_reels_avg_watch_time&access_token=${t}`),
+      )) as { data: { name: string; values: { value: number }[] }[] };
+      for (const d of ins.data ?? []) {
+        const v = Number(d.values?.[0]?.value ?? 0);
+        if (d.name === "views") m.ig_views = v;
+        if (d.name === "reach") m.ig_alcance = v;
+        if (d.name === "saved") m.ig_salvos = v;
+        if (d.name === "shares") m.ig_compartilhamentos = v;
+        if (d.name === "ig_reels_avg_watch_time") m.ig_tempo_medio_ms = v;
+      }
+    } catch (e) {
+      avisos.push(`ig insights: ${e instanceof Error ? e.message : e}`);
+    }
   }
+  if (avisos.length) m.avisos = avisos.join(" | ");
   return m;
 }
 

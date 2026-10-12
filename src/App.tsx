@@ -122,7 +122,7 @@ export default function App() {
         </button>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 md:px-8">
+      <main className="w-full px-4 py-6 md:px-6 2xl:px-10">
         {aba === "visao" && <Visao />}
         {aba === "radar" && <Radar irParaProducao={() => trocar("producao")} />}
         {aba === "producao" && <Producao />}

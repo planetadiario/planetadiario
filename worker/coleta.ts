@@ -17,6 +17,7 @@ export interface Config {
   max_posts_dia: number;
   paises: string[];
   fontes_bloqueadas: string[];
+  aprendizados?: { texto?: string };
 }
 
 export async function lerConfig(db: SupabaseClient): Promise<Config> {
@@ -71,7 +72,7 @@ export async function coletar(env: Bindings) {
     if (error) log.push(`upsert: ${error.message}`);
   }
 
-  await analisarPendentes(env, db, log);
+  await analisarPendentes(env, db, log, cfg.aprendizados?.texto ?? "");
 
   if (cfg.publicacao_automatica) await pilotoAutomatico(env, db, cfg, log);
 
@@ -80,7 +81,7 @@ export async function coletar(env: Bindings) {
   return log;
 }
 
-async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[]) {
+async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[], aprendizados: string) {
   const { data: pendentes, error } = await db
     .from("tendencias")
     .select("*")
@@ -94,7 +95,7 @@ async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[
   try {
     // dois lotes em paralelo para acompanhar o volume da coleta
     const lotes = [pendentes.slice(0, 40), pendentes.slice(40)];
-    const analises = (await Promise.all(lotes.map((l) => analisarTendencias(env, l)))).flat();
+    const analises = (await Promise.all(lotes.filter((l) => l.length).map((l) => analisarTendencias(env, l, aprendizados)))).flat();
     const porId = new Map(analises.map((a) => [a.id, a]));
     const atualizados = pendentes
       .filter((t) => porId.has(t.id))
@@ -190,13 +191,17 @@ export async function atualizarMetricas(env: Bindings) {
     .eq("status", "publicado")
     .gte("publicado_em", desde)
     .order("metricas_em", { ascending: true, nullsFirst: true })
-    .limit(20);
+    .limit(6); // ~8 chamadas por Reel; o plano grátis permite 50 por execução
+  const log: string[] = [];
   for (const r of data ?? []) {
     try {
       const metricas = await metricasReel(env, r.fb_video_id, r.ig_media_id);
       await db.from("reels").update({ metricas, metricas_em: new Date().toISOString() }).eq("id", r.id);
+      log.push(`${r.id}: ${JSON.stringify(metricas)}`);
     } catch (e) {
-      console.log(`métricas ${r.id}: ${e instanceof Error ? e.message : e}`);
+      log.push(`${r.id}: ERRO ${e instanceof Error ? e.message : e}`);
     }
   }
+  console.log(log.join(String.fromCharCode(10)));
+  return log;
 }
