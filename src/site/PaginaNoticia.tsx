@@ -4,6 +4,7 @@ import { supabase } from "../supabase";
 import { aoClicar, entrarComGoogle, nomeCategoria, paragrafosSite, quando, type Leitor, type Noticia } from "./base";
 import { Avatar, LogoGoogle, SeloAssinante } from "./Site";
 import { ChamadaAssinatura, Selos } from "./Inicio";
+import { SeloFundador } from "./Fundadores";
 
 export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: Leitor | null | undefined }) {
   const [n, setN] = useState<Noticia | null | undefined>(undefined);
@@ -105,6 +106,7 @@ interface Comentario {
   nome: string | null;
   avatar: string | null;
   assinante: boolean;
+  fundador: number | null;
 }
 
 export function Comentarios({ noticiaId, leitor, compacto = false }: { noticiaId: string; leitor: Leitor | null | undefined; compacto?: boolean }) {
@@ -173,7 +175,7 @@ export function Comentarios({ noticiaId, leitor, compacto = false }: { noticiaId
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-2 text-sm">
                 <b>{c.nome ?? "Leitor"}</b>
-                {c.assinante && <SeloAssinante />}
+                {c.fundador ? <SeloFundador numero={c.fundador} compacto /> : c.assinante && <SeloAssinante />}
                 <span className="text-xs text-suave">{quando(c.criado_em)}</span>
                 {leitor?.user.id === c.usuario_id && (
                   <button onClick={() => apagar(c.id)} className="ml-auto text-xs text-suave hover:text-red-500">apagar</button>

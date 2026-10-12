@@ -9,6 +9,7 @@ import Producao from "./paginas/Producao";
 import Moldes from "./paginas/Moldes";
 import NovoReel from "./paginas/NovoReel";
 import Ajustes from "./paginas/Ajustes";
+import FundadoresAdmin from "./paginas/Fundadores";
 
 const ABAS = [
   { id: "visao", nome: "Visão geral", icone: "visao" },
@@ -16,6 +17,7 @@ const ABAS = [
   { id: "producao", nome: "Produção", icone: "producao" },
   { id: "novo", nome: "Novo Reel", icone: "novo" },
   { id: "moldes", nome: "Moldes", icone: "moldes" },
+  { id: "fundadores", nome: "Fundadores", icone: "estrela" },
   { id: "ajustes", nome: "Ajustes", icone: "ajustes" },
 ] as const;
 type Aba = (typeof ABAS)[number]["id"];
@@ -93,7 +95,7 @@ export default function App() {
             }`}
           >
             <Icone nome={a.icone} />
-            <span className={`${a.id === "moldes" || a.id === "ajustes" ? "hidden sm:inline" : ""} ${recolhido ? "md:hidden" : ""}`}>{a.nome}</span>
+            <span className={`${a.id === "moldes" || a.id === "ajustes" || a.id === "fundadores" ? "hidden sm:inline" : ""} ${recolhido ? "md:hidden" : ""}`}>{a.nome}</span>
           </button>
         ))}
         <div className={`mt-auto hidden flex-col gap-2 text-xs text-suave md:flex ${recolhido ? "items-center" : "px-3"}`}>
@@ -128,6 +130,7 @@ export default function App() {
         {aba === "producao" && <Producao />}
         {aba === "novo" && <NovoReel criado={() => trocar("producao")} />}
         {aba === "moldes" && <Moldes />}
+        {aba === "fundadores" && <FundadoresAdmin />}
         {aba === "ajustes" && <Ajustes />}
       </main>
     </div>

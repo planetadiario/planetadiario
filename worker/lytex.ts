@@ -43,6 +43,7 @@ export async function criarPix(
   valorCentavos: number,
   cliente: { nome: string; email: string; cpf: string; telefone: string },
   referencia: string,
+  item = "Assinatura Planeta Diário (30 dias)",
 ) {
   const cpf = cliente.cpf.replace(/\D/g, "");
   if (!cpfValido(cpf)) throw new Error("Informe um CPF válido");
@@ -51,8 +52,8 @@ export async function criarPix(
 
   let fatura = await chamar<Fatura>(env, "POST", "/v2/invoices", {
     client: { type: cpf.length === 14 ? "pj" : "pf", name: cliente.nome || "Leitor", cpfCnpj: cpf, email: cliente.email, cellphone: tel },
-    items: [{ name: "Assinatura Planeta Diário (30 dias)", quantity: 1, value: valorCentavos }],
-    observation: "Assinatura Planeta Diário (30 dias)",
+    items: [{ name: item, quantity: 1, value: valorCentavos }],
+    observation: item,
     dueDate: new Date(Date.now() + 30 * 60_000).toISOString().replace(/T.*/, "T23:59:59.000Z"),
     paymentMethods: { pix: { enable: true }, boleto: { enable: false }, creditCard: { enable: false } },
     referenceId: referencia.slice(0, 100),

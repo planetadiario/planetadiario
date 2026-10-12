@@ -49,3 +49,9 @@
 html, body { background: var(--fundo); color: var(--texto); }
 body { -webkit-tap-highlight-color: transparent; font-feature-settings: "tnum"; }
 .cartao { background: var(--painel); border: 1px solid var(--borda); border-radius: 14px; box-shadow: var(--sombra); }
+
+/* certificado de fundador: imprime só o certificado */
+@media print {
+  header, nav, aside, footer, .print\:hidden { display: none !important; }
+  body { background: #fff !important; }
+}

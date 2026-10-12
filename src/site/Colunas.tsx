@@ -5,6 +5,7 @@ import { useInstalar } from "../pwa";
 import { aoClicar, CATEGORIAS, nomeCategoria, type Leitor } from "./base";
 import { Avatar, SeloAssinante } from "./Site";
 import { ChamadaAssinatura } from "./Inicio";
+import { SeloFundador } from "./Fundadores";
 
 type Nav = { aoNavegar?: () => void };
 
@@ -98,6 +99,13 @@ export function ColunaEsquerda({ caminho, leitor, recolhida, aoNavegar }: Nav & 
               <Avatar nome={leitor.nome} url={leitor.avatar} tamanho="size-6" />
             </Linha>
             <Linha href="/conta" rotulo={`${leitor.pontos} pontos`} icone="trofeu" aoNavegar={aoNavegar} />
+            {leitor.fundador && (
+              <>
+                <div className="px-3 py-1.5"><SeloFundador numero={leitor.fundador.numero} /></div>
+                <Linha href="/fundadores/certificado" rotulo="Meu certificado" icone="jornal" ativo={caminho === "/fundadores/certificado"} aoNavegar={aoNavegar} />
+                <Linha href="/fundadores/votacao" rotulo="Votação de pautas" icone="checkCirculo" ativo={caminho === "/fundadores/votacao"} aoNavegar={aoNavegar} />
+              </>
+            )}
             <Linha href="/assinar" rotulo={leitor.assinante ? "Assinatura Pro ativa" : "Assinar o Pro"} icone="estrela" ativo={caminho === "/assinar"} aoNavegar={aoNavegar} />
             {leitor.admin && <Linha href="/painel" rotulo="Painel admin" icone="ajustes" aoNavegar={aoNavegar} />}
           </>
@@ -117,6 +125,10 @@ export function ColunaEsquerda({ caminho, leitor, recolhida, aoNavegar }: Nav & 
       </Secao>
 
       <Secao titulo="Mais do Planeta Diário">
+        <Linha href="/fundadores" rotulo="Clube de Fundadores" ativo={caminho === "/fundadores"} aoNavegar={aoNavegar}>
+          <span className="grid size-[22px] place-items-center rounded-md bg-gradient-to-br from-amber-300 to-amber-600 text-black"><Icone nome="estrela" className="size-3.5" preenchido /></span>
+        </Linha>
+        <Linha href="/fundadores/mural" rotulo="Mural dos Fundadores" icone="usuario" ativo={caminho === "/fundadores/mural"} aoNavegar={aoNavegar} />
         {!leitor?.assinante && (
           <Linha href="/assinar" rotulo="Planeta Diário Pro" aoNavegar={aoNavegar}>
             <span className="grid size-[22px] place-items-center rounded-md bg-marca text-white"><Icone nome="estrela" className="size-3.5" /></span>
@@ -182,6 +194,7 @@ export function ColunaDireita({ leitor, aoNavegar }: Nav & { leitor: Leitor | nu
         </section>
       )}
 
+      {!leitor?.fundador && <ChamadaFundador aoNavegar={aoNavegar} />}
       {!leitor?.assinante && <ChamadaAssinatura />}
 
       {ranking.length > 0 && (
@@ -203,5 +216,27 @@ export function ColunaDireita({ leitor, aoNavegar }: Nav & { leitor: Leitor | nu
         </section>
       )}
     </div>
+  );
+}
+
+function ChamadaFundador({ aoNavegar }: Nav) {
+  return (
+    <a
+      href="/fundadores"
+      onClick={(e) => {
+        aoClicar("/fundadores")(e);
+        aoNavegar?.();
+      }}
+      className="group block overflow-hidden rounded-2xl bg-gradient-to-br from-[#2a0a0e] to-black p-5 text-white"
+    >
+      <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-300">
+        <Icone nome="estrela" className="size-3.5" preenchido /> Clube de Fundadores
+      </p>
+      <p className="mt-1 text-xl font-bold leading-tight">Seja fundador por R$ 15,90</p>
+      <p className="mt-1 text-sm text-white/70">Número eterno, selo exclusivo e seu nome no mural. Pagamento único.</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-amber-300 group-hover:underline">
+        Garantir meu número <Icone nome="seta" className="size-4" />
+      </span>
+    </a>
   );
 }

@@ -55,6 +55,46 @@ site.get("/assinatura/:fatura", async (c) => {
   return c.json({ status: "pendente" });
 });
 
+// ---------- Clube de Fundadores (pagamento único) ----------
+
+site.post("/fundador", async (c) => {
+  const user = await leitor(c);
+  if (!user) return c.json({ erro: "Entre com o Google para ser fundador" }, 401);
+  const { cpf, telefone, nome_mural } = await c.req.json<{ cpf: string; telefone?: string; nome_mural?: string }>();
+  const db = supa(c.env);
+  const { data: cfg } = await db.from("config").select("valor").eq("chave", "fundador_preco_centavos").single();
+  const valor = Number(cfg?.valor ?? 1590);
+  const { data: f, error } = await db
+    .from("fundadores")
+    .insert({ usuario_id: user.id, valor_centavos: valor, nome_mural: (nome_mural ?? "").trim().slice(0, 40) || null })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const pix = await criarPix(
+    c.env,
+    valor,
+    { nome: user.user_metadata?.full_name ?? "", email: user.email ?? "", cpf: cpf ?? "", telefone: telefone ?? "" },
+    `PD-FUND-${f.id}`,
+    "Fundador Planeta Diário (pagamento único)",
+  );
+  await db.from("fundadores").update({ fatura_id: pix.id }).eq("id", f.id);
+  return c.json({ fatura: pix.id, pix: pix.pix, valor });
+});
+
+site.get("/fundador/:fatura", async (c) => {
+  const user = await leitor(c);
+  if (!user) return c.json({ erro: "faça login" }, 401);
+  const db = supa(c.env);
+  const { data: f } = await db.from("fundadores").select("*").eq("fatura_id", c.req.param("fatura")).eq("usuario_id", user.id).maybeSingle();
+  if (!f) return c.json({ erro: "pedido não encontrado" }, 404);
+  if (f.status === "ativo") return c.json({ status: "ativo", numero: f.numero });
+  const fatura = await consultarFatura(c.env, f.fatura_id);
+  if (fatura.status?.toLowerCase() !== "paid") return c.json({ status: "pendente" });
+  const { data: numero, error } = await db.rpc("ativar_fundador", { p_id: f.id });
+  if (error) throw error;
+  return c.json({ status: "ativo", numero });
+});
+
 // Webhook da Lytex (configure: https://planetadiario.online/api/site/lytex?s=<LYTEX_CALLBACK_SECRET>)
 site.post("/lytex", async (c) => {
   try {
@@ -67,6 +107,10 @@ site.post("/lytex", async (c) => {
     const { data: ass } = await db.from("assinaturas").select("*").eq("fatura_id", id).maybeSingle();
     // nunca confia no corpo do webhook: confirma o status direto na Lytex
     if (ass && ass.status !== "ativa" && (await consultarFatura(c.env, id)).status?.toLowerCase() === "paid") await ativar(db, ass);
+    if (!ass) {
+      const { data: f } = await db.from("fundadores").select("id, status").eq("fatura_id", id).maybeSingle();
+      if (f && f.status !== "ativo" && (await consultarFatura(c.env, id)).status?.toLowerCase() === "paid") await db.rpc("ativar_fundador", { p_id: f.id });
+    }
   } catch (e) {
     console.log("webhook lytex:", e instanceof Error ? e.message : e);
   }
@@ -241,7 +285,7 @@ ${(data ?? [])
   .join("\n")}
 </urlset>`;
   } else {
-    const fixas = ["/", "/reels", "/assinar", ...Object.keys(CATEGORIAS).map((c) => `/c/${c}`)];
+    const fixas = ["/", "/reels", "/assinar", "/fundadores", "/fundadores/mural", ...Object.keys(CATEGORIAS).map((c) => `/c/${c}`)];
     xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${fixas.map((p) => `<url><loc>${o}${p}</loc><changefreq>hourly</changefreq></url>`).join("\n")}

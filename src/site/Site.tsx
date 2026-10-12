@@ -8,6 +8,7 @@ import ModoReels from "./ModoReels";
 import Assinar from "./Assinar";
 import Conta from "./Conta";
 import Busca from "./Busca";
+import Fundadores from "./Fundadores";
 import { ColunaDireita, ColunaEsquerda } from "./Colunas";
 
 function lerPreferencia(chave: string) {
@@ -58,6 +59,7 @@ export default function Site() {
   if (partes[0] === "n" && partes[1]) pagina = <PaginaNoticia slug={partes[1]} leitor={leitor} />;
   else if (partes[0] === "assinar") pagina = <Assinar leitor={leitor} />;
   else if (partes[0] === "conta") pagina = <Conta leitor={leitor} />;
+  else if (partes[0] === "fundadores") pagina = <Fundadores leitor={leitor} sub={partes[1]} />;
   else if (partes[0] === "busca") pagina = <Busca termo={new URLSearchParams(window.location.search).get("q") ?? ""} />;
   else pagina = <Inicio categoria={partes[0] === "c" ? partes[1] : undefined} leitor={leitor} />;
 

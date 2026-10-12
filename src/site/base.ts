@@ -101,7 +101,12 @@ export interface Leitor {
   assinante: boolean;
   fimAssinatura: string | null;
   admin: boolean;
+  fundador: { id: string; numero: number; nome_mural: string | null; mostrar_mural: boolean; pago_em: string } | null;
 }
+
+export type Selo = "pioneiro" | "fundador" | "apoiador";
+export const seloDoNumero = (n: number): Selo => (n <= 1000 ? "pioneiro" : n <= 10000 ? "fundador" : "apoiador");
+export const numeroFundador = (n: number) => `#${String(n).padStart(5, "0")}`;
 
 export function useLeitor() {
   const [leitor, setLeitor] = useState<Leitor | null | undefined>(undefined);
@@ -109,10 +114,11 @@ export function useLeitor() {
   useEffect(() => {
     async function carregar(user: User | null | undefined) {
       if (!user) return setLeitor(null);
-      const [perfil, ass, admin] = await Promise.all([
+      const [perfil, ass, admin, fund] = await Promise.all([
         supabase.from("perfis").select("nome, avatar, pontos").eq("id", user.id).maybeSingle(),
         supabase.from("assinaturas").select("fim").eq("usuario_id", user.id).eq("status", "ativa").gt("fim", new Date().toISOString()).order("fim", { ascending: false }).limit(1).maybeSingle(),
         supabase.rpc("is_admin"),
+        supabase.from("fundadores").select("id, numero, nome_mural, mostrar_mural, pago_em").eq("usuario_id", user.id).eq("status", "ativo").maybeSingle(),
       ]);
       setLeitor({
         user,
@@ -122,6 +128,7 @@ export function useLeitor() {
         assinante: !!ass.data,
         fimAssinatura: ass.data?.fim ?? null,
         admin: admin.data === true,
+        fundador: fund.data ?? null,
       });
     }
     supabase.auth.getSession().then(({ data }) => carregar(data.session?.user));
