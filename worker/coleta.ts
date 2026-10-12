@@ -24,7 +24,6 @@ export interface Config {
   horarios_pico?: [number, number][];
   meta_posts_dia?: number;
   urgente_automatico?: boolean;
-  nota_quente?: number;
 }
 
 export const CANAIS_TELEGRAM_PADRAO = [
@@ -242,7 +241,6 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
 
   const hora = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hourCycle: "h23" }));
   const janelas = cfg.horarios_pico?.length ? cfg.horarios_pico : [[7, 9], [11, 14], [17, 23]];
-  const noPico = janelas.some(([a, b]) => hora >= a && hora < b);
 
   // ritmo: se estiver atrás da meta do dia, aceita nota um pouco menor
   const minutosPico = janelas.reduce((s, [a, b]) => s + (b - a) * 60, 0);
@@ -269,24 +267,18 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .slice(0, 5);
   if (!candidatos[0]) return;
 
-  // NOTÍCIA QUENTE (nota alta e recente) fura a fila: quem publica primeiro leva as visualizações.
-  // Ignora o horário de pico (das 6h à meia-noite), usa intervalo curto e pode passar um pouco do limite diário.
-  const notaQuente = cfg.nota_quente ?? 80;
-  const idadeMin = (Date.now() - Date.parse(String(candidatos[0].detectado_em))) / 60_000;
-  const quente = candidatos[0].nota_final >= notaQuente && idadeMin <= 180;
-
-  if (feitosHoje >= cfg.max_posts_dia + (quente ? 5 : 0)) return log.push("piloto: limite diário atingido");
-  if (!(noPico || (quente && hora >= 6))) return;
+  // publica na hora em que a notícia sai, a qualquer hora do dia: perder o momento é perder as visualizações
+  if (feitosHoje >= cfg.max_posts_dia) return log.push("piloto: limite diário atingido");
 
   // até 2 Reels em produção ao mesmo tempo (a montagem leva ~4 min)
   const { count: emProducao } = await db
     .from("reels")
     .select("id", { count: "exact", head: true })
     .in("status", ["na_fila", "processando", "publicando"]);
-  if ((emProducao ?? 0) >= (quente ? 2 : 1)) return;
+  if ((emProducao ?? 0) >= 2) return;
 
-  // intervalo mínimo entre publicações automáticas (curto para notícia quente)
-  const intervalo = quente ? Math.min(10, cfg.intervalo_min_minutos ?? 40) : cfg.intervalo_min_minutos ?? 40;
+  // intervalo mínimo entre publicações automáticas
+  const intervalo = cfg.intervalo_min_minutos ?? 15;
   const { data: ultimo } = await db
     .from("reels")
     .select("publicado_em")
@@ -296,7 +288,7 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .maybeSingle();
   if (ultimo?.publicado_em && Date.now() - Date.parse(ultimo.publicado_em) < intervalo * 60_000) return;
 
-  log.push(`piloto: ${quente ? "QUENTE " : ""}melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
+  log.push(`piloto: melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
 
   for (const t of candidatos) {
     let videoUrl: string | null = t.video_url;
