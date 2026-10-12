@@ -215,8 +215,8 @@ async function threads(env: Bindings, db: SupabaseClient, r: Reel) {
   const pub = await threadsJson(
     await fetch(`${g}/${user_id}/threads_publish`, { method: "POST", body: new URLSearchParams({ creation_id: String(c.id), access_token: token }) }),
   );
-  const link = await threadsJson(await fetch(`${g}/${pub.id}?fields=permalink&access_token=${token}`)).catch(() => ({}) as Record<string, unknown>);
-  return { id: String(pub.id), url: (link.permalink as string) ?? null };
+  const perm = await threadsJson(await fetch(`${g}/${pub.id}?fields=permalink&access_token=${token}`)).catch(() => ({}) as Record<string, unknown>);
+  return { id: String(pub.id), url: (perm.permalink as string) ?? null };
 }
 
 /* ------------------------------ YouTube ------------------------------ */
