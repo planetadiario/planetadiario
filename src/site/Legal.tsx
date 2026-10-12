@@ -1,6 +1,7 @@
 import { aoClicar } from "./base";
 
-const CONTATO = "ceo.planetadiario@gmail.com";
+const CONTATO = "contato@planetadiario.online";
+const PRIVACIDADE = "privacidade@planetadiario.online";
 const ATUALIZADO = "12 de outubro de 2026";
 
 function Pagina({ titulo, children }: { titulo: string; children: React.ReactNode }) {
@@ -51,14 +52,14 @@ export function Privacidade() {
       <p>
         Você pode acessar, corrigir, exportar ou apagar seus dados. A exclusão da conta pode ser feita a qualquer momento em{" "}
         <a href="/conta#privacidade" onClick={aoClicar("/conta#privacidade")} className="text-globo underline">Minha conta → Privacidade e dados</a>. Para outros pedidos, escreva para{" "}
-        <a href={`mailto:${CONTATO}`} className="text-globo underline">{CONTATO}</a>.
+        <a href={`mailto:${PRIVACIDADE}`} className="text-globo underline">{PRIVACIDADE}</a>.
       </p>
       <h2>7. Segurança</h2>
       <p>Usamos conexão criptografada (HTTPS), controle de acesso por usuário no banco de dados e não armazenamos senhas.</p>
       <h2>8. Menores de idade</h2>
       <p>O cadastro e os pagamentos são destinados a maiores de 18 anos ou a menores com autorização dos responsáveis.</p>
       <h2>9. Contato</h2>
-      <p>Encarregado de dados (DPO): <a href={`mailto:${CONTATO}`} className="text-globo underline">{CONTATO}</a>.</p>
+      <p>Encarregado de dados (DPO): <a href={`mailto:${PRIVACIDADE}`} className="text-globo underline">{PRIVACIDADE}</a>.</p>
     </Pagina>
   );
 }
