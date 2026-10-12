@@ -35,10 +35,11 @@ Você vai gerar:
    dinheiro/mercado → "economia"; fato grave de última hora → "urgente"; fato do Brasil sem tema específico → "noticias";
    fato internacional sem tema específico → "mundo"; vídeo inusitado que viralizou → "viral"; história tocante → "emocionante";
    engraçado → "humor"; fato curioso → "curiosidades".
-6. usar_narracao (true/false): decida se este vídeo ganha narração por cima.
-   - false quando o próprio áudio é o conteúdo: alguém falando em PORTUGUÊS, som de animal, música, momento
-     emocionante ou engraçado em que o som original importa, vídeo autoexplicativo sem fala;
-   - true quando há fala ou texto em outra língua, ou quando o vídeo precisa de contexto para ser entendido.
+6. usar_narracao (true/false): narração é a EXCEÇÃO, só quando o vídeo realmente precisa. Na dúvida, false.
+   - true SOMENTE se: (a) há fala importante em outra língua que o brasileiro não entenderia; ou
+     (b) há texto na tela em outra língua essencial para entender; ou (c) sem explicação o vídeo não faz sentido.
+   - false quando: alguém fala em português; o som original é o conteúdo (animal, música, reação, humor,
+     momento emocionante, impacto, multidão); o vídeo se explica sozinho pelas imagens.
 7. narracao: o texto que um narrador de telejornal vai LER em voz alta sobre o vídeo, em português do Brasil:
    - começa pelo fato mais impactante (o gancho tem que prender nos 2 primeiros segundos);
    - 2 a 4 frases curtas, linguagem falada e natural, sem emoji, sem hashtag, sem siglas difíceis;

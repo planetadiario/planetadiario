@@ -23,6 +23,7 @@ export interface Config {
   intervalo_min_minutos?: number;
   horarios_pico?: [number, number][];
   meta_posts_dia?: number;
+  urgente_automatico?: boolean;
 }
 
 export const CANAIS_TELEGRAM_PADRAO = [
@@ -312,8 +313,8 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
       .select("id")
       .single();
     if (error) return log.push(`piloto: ${error.message}`);
-    // fato grave de última hora: monta, mas espera a sua aprovação (risco de informação falsa)
-    await dispararRender(env, reel.id, t.categoria !== "urgente");
+    // URGENTE: publica sozinho se estiver ligado em Ajustes; senão espera aprovação (risco de informação falsa)
+    await dispararRender(env, reel.id, t.categoria !== "urgente" || cfg.urgente_automatico === true);
     return log.push(`piloto: reel ${reel.id} (${t.titulo_pt ?? t.titulo})`);
   }
 }
