@@ -48,6 +48,15 @@ const linkSite = (env: Bindings, r: Reel) => (r.slug ? `${env.SITE_URL}/n/${r.sl
 const tags = (r: Reel, max = 30) =>
   (r.hashtags ?? []).slice(0, max).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
 
+/** corta no limite sem quebrar emoji nem palavra, com reticências */
+function cortar(texto: string, max: number) {
+  const limpo = texto.trim();
+  const letras = Array.from(limpo);
+  if (letras.length <= max) return limpo;
+  const parte = letras.slice(0, max - 1).join("");
+  return `${parte.slice(0, Math.max(parte.lastIndexOf(" "), Math.floor(parte.length / 2))).trimEnd()}…`;
+}
+
 async function baixarVideo(url: string) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`vídeo: HTTP ${r.status}`);
@@ -144,10 +153,11 @@ export async function situacaoRedes(env: Bindings) {
 async function telegram(env: Bindings, r: Reel) {
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const link = linkSite(env, r);
-  const legenda = `<b>${esc(r.manchete ?? "")}</b>\n\n${esc((r.legenda ?? "").slice(0, 700))}\n\n<a href="${link}">Leia no Planeta Diário</a>`;
+  // limite de 1024 caracteres da legenda do Telegram: o link nunca é cortado
+  const legenda = `<b>${esc(r.manchete ?? "")}</b>\n\n${esc(cortar(r.legenda ?? "", 600))}\n\n<a href="${link}">Leia no Planeta Diário</a>`;
   const form = new FormData();
   form.append("chat_id", env.TELEGRAM_CANAL!);
-  form.append("caption", legenda.slice(0, 1024));
+  form.append("caption", legenda);
   form.append("parse_mode", "HTML");
   form.append("supports_streaming", "true");
   form.append("width", "1080");
@@ -187,7 +197,9 @@ async function threadsJson(r: Response) {
 async function threads(env: Bindings, db: SupabaseClient, r: Reel) {
   const { token, user_id } = await tokenThreads(env, db);
   const g = "https://graph.threads.net/v1.0";
-  const texto = `${r.manchete ?? ""}\n\n${(r.legenda ?? "").slice(0, 300)}\n\n${linkSite(env, r)}`.slice(0, 495);
+  // o link vai sempre inteiro no fim; quem encurta é a legenda (limite de 500 caracteres do Threads)
+  const link = linkSite(env, r);
+  const texto = `${cortar(`${r.manchete ?? ""}\n\n${r.legenda ?? ""}`, 480 - link.length)}\n\n${link}`;
   const c = await threadsJson(
     await fetch(`${g}/${user_id}/threads`, {
       method: "POST",
