@@ -86,7 +86,6 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
     const FB_METRICAS: Record<string, string> = {
       blue_reels_play_count: "fb_views",
       fb_reels_total_plays: "fb_views_total",
-      post_impressions_unique: "fb_alcance",
       post_video_avg_time_watched: "fb_tempo_medio_ms",
       post_video_followers: "fb_novos_seguidores",
     };

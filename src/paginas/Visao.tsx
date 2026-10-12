@@ -8,6 +8,11 @@ interface Metricas {
   fb_comentarios: number;
   ig_curtidas: number;
   ig_comentarios: number;
+  fb_views?: number;
+  ig_views?: number;
+  ig_alcance?: number;
+  fb_tempo_medio_ms?: number;
+  ig_tempo_medio_ms?: number;
 }
 interface ReelPub {
   id: string;
@@ -25,6 +30,7 @@ type Periodo = keyof typeof PERIODOS;
 const DIA = 86400_000;
 
 const eng = (m: Metricas | null) => (m ? m.fb_curtidas + m.fb_comentarios + m.ig_curtidas + m.ig_comentarios : 0);
+const views = (m: Metricas | null) => (m ? (m.fb_views ?? 0) + (m.ig_views ?? 0) : 0);
 
 export default function Visao() {
   const [periodo, setPeriodo] = useState<Periodo>("30 dias");
@@ -58,6 +64,7 @@ export default function Visao() {
     const soma = (rs: ReelPub[], k: keyof Metricas) => rs.reduce((s, r) => s + (r.metricas?.[k] ?? 0), 0);
     const kpi = (rs: ReelPub[]) => ({
       posts: rs.length,
+      views: rs.reduce((s, r) => s + views(r.metricas), 0),
       curtidas: soma(rs, "fb_curtidas") + soma(rs, "ig_curtidas"),
       comentarios: soma(rs, "fb_comentarios") + soma(rs, "ig_comentarios"),
       engajamento: rs.reduce((s, r) => s + eng(r.metricas), 0),
@@ -71,7 +78,7 @@ export default function Visao() {
         const t = new Date(r.publicado_em).getTime();
         return t >= ini.getTime() && t < fim;
       });
-      return { dia: ini, valor: doDia.reduce((s, r) => s + eng(r.metricas), 0), posts: doDia.length };
+      return { dia: ini, valor: doDia.reduce((s, r) => s + views(r.metricas), 0), posts: doDia.length };
     });
 
     const porCat = new Map<string, number>();
@@ -81,10 +88,10 @@ export default function Visao() {
       atual: kpi(atual),
       anterior: kpi(anterior),
       serie,
-      fb: soma(atual, "fb_curtidas") + soma(atual, "fb_comentarios"),
-      ig: soma(atual, "ig_curtidas") + soma(atual, "ig_comentarios"),
+      fb: soma(atual, "fb_views"),
+      ig: soma(atual, "ig_views"),
       categorias: [...porCat.entries()].sort((a, b) => b[1] - a[1]),
-      top: [...atual].sort((a, b) => eng(b.metricas) - eng(a.metricas)).slice(0, 5),
+      top: [...atual].sort((a, b) => views(b.metricas) - views(a.metricas) || eng(b.metricas) - eng(a.metricas)).slice(0, 8),
     };
   }, [reels, periodo]);
 
@@ -105,8 +112,9 @@ export default function Visao() {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Kpi icone="producao" rotulo="Reels publicados" valor={d.atual.posts} antes={d.anterior.posts} />
+        <Kpi icone="video" rotulo="Visualizações" valor={d.atual.views} antes={d.anterior.views} />
         <Kpi icone="curtida" rotulo="Curtidas" valor={d.atual.curtidas} antes={d.anterior.curtidas} />
         <Kpi icone="comentario" rotulo="Comentários" valor={d.atual.comentarios} antes={d.anterior.comentarios} />
         <Kpi icone="raio" rotulo="Engajamento total" valor={d.atual.engajamento} antes={d.anterior.engajamento} />
@@ -114,13 +122,13 @@ export default function Visao() {
 
       <section className="grid gap-5 lg:grid-cols-3">
         <div className="cartao p-5 lg:col-span-2">
-          <h2 className="font-semibold">Engajamento ao longo do tempo</h2>
-          <p className="mb-4 text-xs text-suave">Curtidas + comentários dos Reels publicados em cada dia</p>
+          <h2 className="font-semibold">Visualizações ao longo do tempo</h2>
+          <p className="mb-4 text-xs text-suave">Visualizações (Facebook + Instagram) dos Reels publicados em cada dia</p>
           <GraficoLinha serie={d.serie} />
         </div>
         <div className="cartao p-5">
           <h2 className="font-semibold">Por plataforma</h2>
-          <p className="mb-5 text-xs text-suave">Engajamento no período</p>
+          <p className="mb-5 text-xs text-suave">Visualizações no período</p>
           <Plataformas fb={d.fb} ig={d.ig} />
           <div className="mt-6 grid grid-cols-3 gap-2 border-t border-borda pt-4 text-center">
             <Mini rotulo="Em produção" valor={fila.producao} />
@@ -150,7 +158,7 @@ export default function Visao() {
           )}
         </div>
         <div className="cartao p-5 lg:col-span-2">
-          <h2 className="mb-4 font-semibold">Melhores Reels</h2>
+          <h2 className="mb-4 font-semibold">Reels por desempenho</h2>
           {d.top.length === 0 ? (
             <Vazio />
           ) : (
@@ -158,9 +166,10 @@ export default function Visao() {
               <thead>
                 <tr className="text-left text-xs text-suave">
                   <th className="pb-2 font-medium">Reel</th>
-                  <th className="pb-2 text-right font-medium text-fb">Facebook</th>
-                  <th className="pb-2 text-right font-medium text-ig">Instagram</th>
-                  <th className="pb-2 text-right font-medium">Total</th>
+                  <th className="pb-2 text-right font-medium text-fb">Views FB</th>
+                  <th className="pb-2 text-right font-medium text-ig">Views IG</th>
+                  <th className="hidden pb-2 text-right font-medium md:table-cell">Retenção</th>
+                  <th className="pb-2 text-right font-medium">Engaj.</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,10 +186,13 @@ export default function Visao() {
                       </div>
                     </td>
                     <td className="text-right tabular-nums">
-                      {r.fb_post_url ? <a href={r.fb_post_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto((r.metricas?.fb_curtidas ?? 0) + (r.metricas?.fb_comentarios ?? 0)) || "0"}</a> : "—"}
+                      {r.fb_post_url ? <a href={r.fb_post_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto(r.metricas?.fb_views ?? 0) || "0"}</a> : "—"}
                     </td>
                     <td className="text-right tabular-nums">
-                      {r.ig_post_url ? <a href={r.ig_post_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto((r.metricas?.ig_curtidas ?? 0) + (r.metricas?.ig_comentarios ?? 0)) || "0"}</a> : "—"}
+                      {r.ig_post_url ? <a href={r.ig_post_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto(r.metricas?.ig_views ?? 0) || "0"}</a> : "—"}
+                    </td>
+                    <td className="hidden text-right text-xs tabular-nums text-suave md:table-cell" title="Tempo médio assistido (Facebook / Instagram)">
+                      {r.metricas?.fb_tempo_medio_ms != null ? `${Math.round(r.metricas.fb_tempo_medio_ms / 1000)}s` : "—"} / {r.metricas?.ig_tempo_medio_ms != null ? `${Math.round(r.metricas.ig_tempo_medio_ms / 1000)}s` : "—"}
                     </td>
                     <td className="text-right font-semibold tabular-nums">{numeroCurto(eng(r.metricas)) || "0"}</td>
                   </tr>
@@ -316,7 +328,7 @@ function GraficoLinha({ serie }: { serie: { dia: Date; valor: number; posts: num
         >
           <p className="font-semibold">{fmt(h.dia)}</p>
           <p className="text-suave">
-            <b className="text-texto tabular-nums">{h.valor}</b> de engajamento · {h.posts} reel{h.posts === 1 ? "" : "s"}
+            <b className="text-texto tabular-nums">{h.valor}</b> visualizações · {h.posts} reel{h.posts === 1 ? "" : "s"}
           </p>
         </div>
       )}

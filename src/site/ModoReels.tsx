@@ -14,7 +14,7 @@ export default function ModoReels({ leitor, inicio }: { leitor: Leitor | null | 
   const [atual, setAtual] = useState(0);
   const [som, setSom] = useState(false);
   const [folha, setFolha] = useState(false);
-  const [painel, setPainel] = useState(true);
+  const [painel, setPainel] = useState(false); // abre com o painel de comentários fechado
   const [inter, setInter] = useState<Record<string, Interacao>>({});
   const lista = useRef<HTMLDivElement>(null);
 
