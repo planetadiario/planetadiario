@@ -7,11 +7,13 @@ import PaginaNoticia from "./PaginaNoticia";
 import ModoReels from "./ModoReels";
 import Assinar from "./Assinar";
 import Conta from "./Conta";
+import MenuLateral from "./MenuLateral";
 
 export default function Site() {
   const caminho = useCaminho();
   const leitor = useLeitor();
   const [, setTema] = useState(0);
+  const [menu, setMenu] = useState(false);
 
   const partes = caminho.split("/").filter(Boolean);
   if (partes[0] === "reels") return <ModoReels leitor={leitor} inicio={partes[1]} />;
@@ -37,7 +39,7 @@ export default function Site() {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-borda bg-fundo/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
           <a href="/" onClick={aoClicar("/")} className="shrink-0">
             <img src="/logo-claro.png" alt="Planeta Diário" className="h-8 dark:hidden" />
             <img src="/logo.png" alt="Planeta Diário" className="hidden h-8 dark:block" />
@@ -55,9 +57,12 @@ export default function Site() {
               <Icone nome="sol" className="hidden size-4 dark:block" />
             </button>
             <BotaoConta leitor={leitor} />
+            <button onClick={() => setMenu(true)} aria-label="Abrir menu" className="grid size-9 place-items-center rounded-full hover:bg-painel-2 lg:hidden">
+              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2 text-sm [scrollbar-width:none]">
+        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2 text-sm [scrollbar-width:none]">
           <a href="/" onClick={aoClicar("/")} className={`shrink-0 rounded-full px-3 py-1 ${!catAtual && partes.length === 0 ? "bg-texto text-fundo" : "text-suave hover:text-texto"}`}>
             Últimas
           </a>
@@ -74,10 +79,31 @@ export default function Site() {
         </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">{pagina}</main>
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <main className="min-w-0">{pagina}</main>
+        <aside className="hidden lg:block">
+          <div className="sticky top-32 max-h-[calc(100dvh-9rem)] overflow-y-auto pb-6 [scrollbar-width:thin]">
+            <MenuLateral leitor={leitor} caminho={caminho} />
+          </div>
+        </aside>
+      </div>
+
+      {/* menu lateral no celular: gaveta pela direita */}
+      {menu && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMenu(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div onClick={(e) => e.stopPropagation()} className="absolute inset-y-0 right-0 w-[86%] max-w-sm overflow-y-auto bg-fundo p-4 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <b>Menu</b>
+              <button onClick={() => setMenu(false)} aria-label="Fechar menu" className="grid size-9 place-items-center rounded-full hover:bg-painel-2">✕</button>
+            </div>
+            <MenuLateral leitor={leitor} caminho={caminho} aoNavegar={() => setMenu(false)} />
+          </div>
+        </div>
+      )}
 
       <footer className="mt-10 border-t border-borda">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-suave">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-suave">
           <p>© {new Date().getFullYear()} Planeta Diário — tudo o que acontece no mundo, em vídeo.</p>
           <a href="/assinar" onClick={aoClicar("/assinar")} className="font-medium text-marca">Seja assinante</a>
         </div>

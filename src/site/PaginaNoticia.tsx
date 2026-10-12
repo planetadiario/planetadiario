@@ -30,9 +30,9 @@ export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: 
   const paragrafos = (n.artigo ?? n.legenda ?? "").split(/\n\s*\n/).filter((p) => !/^(📌|🎥|#)/u.test(p.trim()));
 
   return (
-    <article className="grid gap-8 lg:grid-cols-[380px_1fr]">
-      <div className="lg:sticky lg:top-28 lg:self-start">
-        <div className="relative mx-auto aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-2xl bg-black">
+    <article className="grid gap-8 md:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="md:sticky md:top-32 md:self-start">
+        <div className="relative mx-auto aspect-[9/16] w-full max-w-[340px] overflow-hidden rounded-2xl bg-black">
           {n.video_url ? (
             <video src={n.video_url} poster={n.thumb_url ?? undefined} controls playsInline autoPlay muted className="h-full w-full" />
           ) : (

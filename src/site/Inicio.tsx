@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../supabase";
 import Icone from "../Icone";
 import { aoClicar, buscarNoticias, nomeCategoria, quando, type Leitor, type Noticia } from "./base";
-import { Avatar, SeloAssinante } from "./Site";
 
 export default function Inicio({ categoria, leitor }: { categoria?: string; leitor: Leitor | null | undefined }) {
   const [itens, setItens] = useState<Noticia[] | null>(null);
@@ -32,8 +30,7 @@ export default function Inicio({ categoria, leitor }: { categoria?: string; leit
   const lista = categoria ? resto : resto.slice(8);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
-      <div className="flex min-w-0 flex-col gap-8">
+    <div className="flex min-w-0 flex-col gap-8">
         {categoria && <h1 className="text-2xl font-bold">{nomeCategoria(categoria)}</h1>}
 
         <Destaque n={destaque} />
@@ -65,12 +62,6 @@ export default function Inicio({ categoria, leitor }: { categoria?: string; leit
             </button>
           )}
         </section>
-      </div>
-
-      <aside className="flex flex-col gap-5">
-        {!leitor?.assinante && <ChamadaAssinatura />}
-        <Ranking />
-      </aside>
     </div>
   );
 }
@@ -157,31 +148,6 @@ export function ChamadaAssinatura() {
       <a href="/assinar" onClick={aoClicar("/assinar")} className="mt-4 block rounded-full bg-white py-2 text-center text-sm font-bold text-marca">
         Assinar agora
       </a>
-    </div>
-  );
-}
-
-function Ranking() {
-  const [lista, setLista] = useState<{ nome: string; avatar: string | null; pontos: number; assinante: boolean }[]>([]);
-  useEffect(() => {
-    supabase.rpc("ranking_leitores", { p_limite: 8 }).then(({ data }) => setLista(data ?? []));
-  }, []);
-  if (!lista.length) return null;
-  return (
-    <div className="cartao p-5">
-      <h3 className="mb-3 font-bold">🏆 Leitores em destaque</h3>
-      <ol className="flex flex-col gap-2.5">
-        {lista.map((l, i) => (
-          <li key={i} className="flex items-center gap-2.5 text-sm">
-            <span className="w-4 text-xs font-bold text-suave">{i + 1}</span>
-            <Avatar nome={l.nome ?? "?"} url={l.avatar} />
-            <span className="min-w-0 flex-1 truncate">{l.nome}</span>
-            {l.assinante && <SeloAssinante />}
-            <span className="text-xs font-semibold tabular-nums">{l.pontos} pts</span>
-          </li>
-        ))}
-      </ol>
-      <p className="mt-3 text-xs text-suave">Comente nas notícias para ganhar pontos.</p>
     </div>
   );
 }
