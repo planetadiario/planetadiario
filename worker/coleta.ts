@@ -133,6 +133,25 @@ export async function coletar(env: Bindings, forcarGrupo?: "par" | "impar") {
  * Pré-nota por sinais objetivos (sem IA): decide o que a IA analisa primeiro.
  * Assim os itens mais promissores sempre recebem nota, mesmo com o limite do plano grátis.
  */
+/** Popularidade real (0–100) pelo volume de cada fonte: buscas, views, curtidas */
+export function popularidade(t: Tendencia): number {
+  const v = Number(t.trafego ?? 0);
+  const escala = (x: number, max: number) => Math.min(100, (Math.log10(Math.max(1, x)) / Math.log10(max)) * 100);
+  switch (t.fonte) {
+    case "google_trends": return escala(v, 200_000); // 1,8 mil buscas ≈ 61
+    case "youtube": return escala(v, 5_000_000);
+    case "dailymotion": return escala(v, 20_000); // views na última hora
+    case "bluesky": return escala(v, 20_000); // curtidas
+    case "telegram": return 60; // canais de última hora (sem contador público)
+    default: return 45;
+  }
+}
+
+/** Nota final para publicar: 60% qualidade/viralização da IA + 40% popularidade real */
+export function notaFinal(t: Tendencia): number {
+  return Math.round(0.6 * Number(t.score ?? 0) + 0.4 * popularidade(t));
+}
+
 export function preNota(t: Tendencia): number {
   const idadeMin = (Date.now() - Date.parse(String(t.extra?.publicado ?? t.detectado_em ?? Date.now()))) / 60_000;
   const frescor = Number.isFinite(idadeMin) ? Math.max(0, 1 - idadeMin / 360) : 0.5; // perde valor em 6 h
@@ -229,7 +248,7 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
   const minutosPassados = janelas.reduce((s, [a, b]) => s + Math.max(0, Math.min(hora, b) - a) * 60, 0);
   const esperado = Math.floor(((cfg.meta_posts_dia ?? 8) * minutosPassados) / Math.max(1, minutosPico));
   const atrasado = (count ?? 0) < esperado;
-  const notaMinima = atrasado ? Math.max(60, cfg.score_minimo_auto - 10) : cfg.score_minimo_auto;
+  const notaMinima = atrasado ? Math.max(45, cfg.score_minimo_auto - 5) : cfg.score_minimo_auto; // nota FINAL mínima
 
   // reels em produção seguram a fila (evita publicar vários de uma vez)
   const { count: emProducao } = await db
@@ -249,18 +268,25 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .maybeSingle();
   if (ultimo?.publicado_em && Date.now() - Date.parse(ultimo.publicado_em) < intervalo * 60_000) return;
 
+  // candidatos: nota da IA >= 50 (qualidade mínima); a ordem usa a nota final (IA + popularidade real)
   const desde = new Date(Date.now() - 12 * 3600_000).toISOString();
-  const { data: candidatos } = await db
+  const { data: brutos } = await db
     .from("tendencias")
     .select("*")
     .eq("usado", false)
     .eq("analisado", true)
-    .gte("score", notaMinima)
+    .gte("score", 50)
     .gte("detectado_em", desde)
     .order("score", { ascending: false })
-    .limit(5);
+    .limit(80);
+  const candidatos = (brutos ?? [])
+    .map((t) => ({ ...t, nota_final: notaFinal(t) }))
+    .filter((t) => t.nota_final >= notaMinima)
+    .sort((a, b) => b.nota_final - a.nota_final)
+    .slice(0, 5);
+  if (candidatos[0]) log.push(`piloto: melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
 
-  for (const t of candidatos ?? []) {
+  for (const t of candidatos) {
     let videoUrl: string | null = t.video_url;
     let autor = t.extra?.autor ?? null;
     if (!videoUrl) {

@@ -93,12 +93,12 @@ export default function Ajustes() {
             </span>
           </section>
           <section className="cartao flex flex-col gap-6 p-6">
-            <Faixa rotulo="Nota mínima de viralização" valor={cfg.score_minimo_auto} min={50} max={95} passo={5} aoMudar={(v) => gravar("score_minimo_auto", v)} />
+            <Faixa rotulo="Nota final mínima (60% IA + 40% buscas/views)" valor={cfg.score_minimo_auto} min={40} max={90} passo={5} aoMudar={(v) => gravar("score_minimo_auto", v)} />
             <Faixa rotulo="Máximo de Reels por dia" valor={cfg.max_posts_dia} min={1} max={30} aoMudar={(v) => gravar("max_posts_dia", v)} />
             <Faixa rotulo="Intervalo mínimo entre posts (minutos)" valor={cfg.intervalo_min_minutos ?? 40} min={10} max={180} passo={5} aoMudar={(v) => gravar("intervalo_min_minutos", v)} />
             <Faixa rotulo="Meta mínima de posts por dia" valor={cfg.meta_posts_dia ?? 8} min={1} max={30} aoMudar={(v) => gravar("meta_posts_dia", v)} />
             <p className="text-xs text-suave">
-              Publica só nos horários de pico ({(cfg.horarios_pico ?? [[7, 9], [11, 14], [17, 23]]).map(([a, b]) => `${a}h–${b}h`).join(", ")}). Se estiver atrás da meta do dia, aceita nota até 10 pontos menor. Assuntos URGENTES esperam a sua aprovação.
+              Publica só nos horários de pico ({(cfg.horarios_pico ?? [[7, 9], [11, 14], [17, 23]]).map(([a, b]) => `${a}h–${b}h`).join(", ")}). Se estiver atrás da meta do dia, aceita nota final 5 pontos menor. Assuntos URGENTES esperam a sua aprovação.
             </p>
           </section>
         </div>

@@ -37,11 +37,13 @@ jobs:
           for i in $(seq 1 15); do curl -s --socks5-hostname 127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep -q "warp=on" && break; sleep 2; done
           curl -s --socks5-hostname 127.0.0.1:40000 https://www.cloudflare.com/cdn-cgi/trace | grep -E "^(warp|colo)="
           echo "proxy=socks5://127.0.0.1:40000" >> "$GITHUB_OUTPUT"
-      - name: Cache das vozes de narração
+      - name: Cache das vozes e do Whisper
         uses: actions/cache@v4
         with:
-          path: pipeline/vozes
-          key: vozes-piper-v1
+          path: |
+            pipeline/vozes
+            ~/.cache/huggingface
+          key: modelos-v1
       - name: Instalar dependências
         run: pip install -U -r pipeline/requirements.txt
       - name: Montar

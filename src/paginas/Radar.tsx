@@ -129,12 +129,12 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
           Nada por aqui ainda. Clique em “Coletar agora” ou aguarde a próxima coleta automática (a cada 10 min).
         </p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {itens.map((t) => (
             <article key={t.id} className="flex flex-col overflow-hidden cartao">
               {t.imagem && (
-                <div className="relative aspect-video bg-black">
-                  <img src={t.imagem} alt="" loading="lazy" className="h-full w-full object-cover" />
+                <div className="relative aspect-video overflow-hidden bg-black">
+                  <img src={t.imagem} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                   {t.extra?.duracao != null && (
                     <span className="absolute bottom-1.5 right-1.5 rounded bg-black/75 px-1.5 text-xs">
                       {Math.floor(t.extra.duracao / 60)}:{String(t.extra.duracao % 60).padStart(2, "0")}
@@ -142,17 +142,17 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
                   )}
                 </div>
               )}
-              <div className="flex flex-1 flex-col gap-2 p-3">
-                <div className="flex items-center gap-2 text-xs text-suave">
+              <div className="flex flex-1 flex-col gap-1.5 p-2.5">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-suave">
                   <Score valor={t.analisado ? t.score : null} />
                   <span className="rounded bg-marca px-1.5 py-0.5 font-bold text-white">{nomeCat(t.categoria)}</span>
                   <span className="flex items-center gap-1 rounded bg-painel-2 px-1.5 py-0.5 font-semibold"><Icone nome="globo" className="size-3" />{t.pais ?? "—"}</span>
                   <span>{FONTE[t.fonte] ?? t.fonte}</span>
                   <span className="ml-auto">{tempoAtras(t.detectado_em)}</span>
                 </div>
-                <h2 className="font-semibold leading-snug">{t.titulo_pt ?? t.titulo}</h2>
-                {t.titulo_pt && t.titulo_pt !== t.titulo && <p className="text-xs text-suave">{t.titulo}</p>}
-                {t.resumo && <p className="text-sm text-suave">{t.resumo}</p>}
+                <h2 className="line-clamp-2 text-sm font-semibold leading-snug">{t.titulo_pt ?? t.titulo}</h2>
+                {t.titulo_pt && t.titulo_pt !== t.titulo && <p className="line-clamp-1 text-[11px] text-suave">{t.titulo}</p>}
+                {t.resumo && <p className="line-clamp-2 text-xs text-suave">{t.resumo}</p>}
                 <div className="mt-auto flex flex-wrap items-center gap-2 pt-1 text-sm">
                   {t.trafego != null && (
                     <span className="text-xs text-suave">
