@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import Icone from "../Icone";
+import PlanoSemanal, { type MetasSemanais } from "./PlanoSemanal";
 
 interface Dados {
   metas: { seguidores: number; minutos_60d: number; reels_30d: number };
@@ -9,6 +10,8 @@ interface Dados {
   minutos_60d: { fb: number; ig: number };
   reels_30d: number;
   reels_hoje: number;
+  semana: MetasSemanais & { inicio: string };
+  metas_semanais: MetasSemanais;
 }
 
 const n = (v: number) => v.toLocaleString("pt-BR");
@@ -39,6 +42,8 @@ export default function MetasMonetizacao() {
   const prontas = metas.filter((m) => m.valor >= m.meta).length;
 
   return (
+    <>
+    <PlanoSemanal semana={d.semana} metas={d.metas_semanais} />
     <section className="cartao p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -68,5 +73,6 @@ export default function MetasMonetizacao() {
         })}
       </div>
     </section>
+    </>
   );
 }

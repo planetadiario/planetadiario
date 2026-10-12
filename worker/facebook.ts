@@ -36,6 +36,29 @@ export async function publicarReel(env: Bindings, videoUrl: string, descricao: s
 }
 
 /**
+ * Compartilha o vídeo também nos stories da página (os seguidores veem no topo do feed).
+ * https://developers.facebook.com/docs/page-stories-api
+ */
+export async function publicarStoryFacebook(env: Bindings, videoUrl: string) {
+  const v = env.FB_GRAPH_VERSION;
+  const base = `https://graph.facebook.com/${v}/${env.FB_PAGE_ID}/video_stories`;
+  const token = env.FB_PAGE_TOKEN;
+  const ini = (await fbJson(
+    await fetch(base, { method: "POST", body: new URLSearchParams({ upload_phase: "start", access_token: token }) }),
+  )) as { video_id: string; upload_url?: string };
+  await fbJson(
+    await fetch(ini.upload_url ?? `https://rupload.facebook.com/video-upload/${v}/${ini.video_id}`, {
+      method: "POST",
+      headers: { Authorization: `OAuth ${token}`, file_url: videoUrl },
+    }),
+  );
+  const fim = (await fbJson(
+    await fetch(base, { method: "POST", body: new URLSearchParams({ upload_phase: "finish", video_id: ini.video_id, access_token: token }) }),
+  )) as { post_id?: string };
+  return fim.post_id ?? ini.video_id;
+}
+
+/**
  * Publica o mesmo Reel no Instagram ligado à página (conta profissional).
  * https://developers.facebook.com/docs/instagram-platform/content-publishing
  */

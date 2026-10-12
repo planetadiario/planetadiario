@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Bindings } from "./env";
 import { atualizarMetricas, coletar, supa } from "./coleta";
 import { buscarVideos } from "./coletores";
-import { apagarInstagram, publicarReel, publicarReelInstagram } from "./facebook";
+import { apagarInstagram, publicarReel, publicarReelInstagram, publicarStoryFacebook } from "./facebook";
 import { dispararRender } from "./github";
 import { paginaCategoria, paginaNoticia, site, sitemap } from "./site";
 import { gerarAprendizados } from "./aprendizados";
@@ -111,16 +111,34 @@ app.get("/monetizacao", async (c) => {
   const db = supa(c.env);
   const desde60 = new Date(Date.now() - 60 * 86400_000).toISOString();
   const desde30 = Date.now() - 30 * 86400_000;
-  const [hist, reels, cfg] = await Promise.all([
+  const [hist, reels, cfg, cfgSemana] = await Promise.all([
     db.from("seguidores_historico").select("dia, fb, ig").order("dia", { ascending: false }).limit(60),
-    db.from("reels").select("publicado_em, metricas").eq("status", "publicado").gte("publicado_em", desde60),
+    db.from("reels").select("publicado_em, metricas, fb_video_id, ig_media_id, fb_story_id").eq("status", "publicado").gte("publicado_em", desde60),
     db.from("config").select("valor").eq("chave", "metas_monetizacao").maybeSingle(),
+    db.from("config").select("valor").eq("chave", "metas_semanais").maybeSingle(),
   ]);
   const ms = (m: Record<string, unknown> | null, k: string) => Number(m?.[k] ?? 0);
   const lista = reels.data ?? [];
   const minFb = lista.reduce((s, r) => s + ms(r.metricas, "fb_tempo_total_ms"), 0) / 60000;
   const minIg = lista.reduce((s, r) => s + ms(r.metricas, "ig_tempo_total_ms"), 0) / 60000;
+  // semana começa segunda 00:00 no horário de Brasília (UTC-3)
+  const br = new Date(Date.now() - 3 * 3600_000);
+  const inicioSemana = Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), br.getUTCDate() - ((br.getUTCDay() + 6) % 7)) + 3 * 3600_000;
+  const daSemana = lista.filter((r) => Date.parse(r.publicado_em) >= inicioSemana);
+  const histSemana = (hist.data ?? []).filter((h) => Date.parse(h.dia) < inicioSemana);
+  const baseSeg = histSemana[0] ?? hist.data?.[hist.data.length - 1];
+  const semana = {
+    inicio: new Date(inicioSemana).toISOString(),
+    posts_fb: daSemana.filter((r) => r.fb_video_id).length,
+    posts_ig: daSemana.filter((r) => r.ig_media_id).length,
+    stories_fb: daSemana.filter((r) => r.fb_story_id).length,
+    views_fb: daSemana.reduce((s, r) => s + ms(r.metricas, "fb_views"), 0),
+    views_ig: daSemana.reduce((s, r) => s + ms(r.metricas, "ig_views"), 0),
+    seguidores: hist.data?.[0] && baseSeg ? hist.data[0].fb + hist.data[0].ig - baseSeg.fb - baseSeg.ig : 0,
+  };
   return c.json({
+    semana,
+    metas_semanais: cfgSemana.data?.valor ?? { posts_fb: 40, posts_ig: 40, stories_fb: 7, views_fb: 2000, views_ig: 30000, seguidores: 100 },
     metas: cfg.data?.valor ?? { seguidores: 5000, minutos_60d: 60000, reels_30d: 5 },
     seguidores: hist.data?.[0] ?? null,
     historico: (hist.data ?? []).reverse(),
@@ -220,8 +238,17 @@ async function publicar(env: Bindings, id: string) {
     }
   }
 
-  // Site: assinantes veem na hora; o público, depois do acesso antecipado
+  // Story da página: avisa os seguidores (falha aqui não impede a publicação)
   const extra: Record<string, unknown> = { status: "publicado" };
+  if (!reel.fb_story_id) {
+    try {
+      extra.fb_story_id = await publicarStoryFacebook(env, reel.video_url);
+    } catch (e) {
+      console.log("story do Facebook falhou:", e instanceof Error ? e.message : e);
+    }
+  }
+
+  // Site: assinantes veem na hora; o público, depois do acesso antecipado
   if (!reel.site_publicado_em) {
     const { data: cfg } = await db.from("config").select("valor").eq("chave", "acesso_antecipado_min").maybeSingle();
     const agora = Date.now();
