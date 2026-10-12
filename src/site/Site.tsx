@@ -1,31 +1,47 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
 import Icone from "../Icone";
-import { aoClicar, CATEGORIAS, entrarComGoogle, useCaminho, useLeitor, type Leitor } from "./base";
+import { aoClicar, entrarComGoogle, navegar, useCaminho, useLeitor, type Leitor } from "./base";
 import Inicio from "./Inicio";
 import PaginaNoticia from "./PaginaNoticia";
 import ModoReels from "./ModoReels";
 import Assinar from "./Assinar";
 import Conta from "./Conta";
-import MenuLateral from "./MenuLateral";
+import { ColunaDireita, ColunaEsquerda } from "./Colunas";
+
+function lerPreferencia(chave: string) {
+  try {
+    return localStorage.getItem(chave);
+  } catch {
+    return null;
+  }
+}
+function gravarPreferencia(chave: string, valor: string) {
+  try {
+    localStorage.setItem(chave, valor);
+  } catch {
+    /* sem storage */
+  }
+}
 
 export default function Site() {
   const caminho = useCaminho();
   const leitor = useLeitor();
   const [, setTema] = useState(0);
-  const [menu, setMenu] = useState(false);
+  const [gaveta, setGaveta] = useState(false);
+  const [recolhida, setRecolhida] = useState(() => lerPreferencia("coluna") === "recolhida");
 
   const partes = caminho.split("/").filter(Boolean);
   if (partes[0] === "reels") return <ModoReels leitor={leitor} inicio={partes[1]} />;
 
   function alternarTema() {
     const escuro = document.documentElement.classList.toggle("dark");
-    try {
-      localStorage.setItem("tema", escuro ? "escuro" : "claro");
-    } catch {
-      /* sem storage */
-    }
+    gravarPreferencia("tema", escuro ? "escuro" : "claro");
     setTema((t) => t + 1);
+  }
+  function alternarColuna() {
+    setRecolhida(!recolhida);
+    gravarPreferencia("coluna", recolhida ? "aberta" : "recolhida");
   }
 
   let pagina: React.ReactNode;
@@ -34,90 +50,101 @@ export default function Site() {
   else if (partes[0] === "conta") pagina = <Conta leitor={leitor} />;
   else pagina = <Inicio categoria={partes[0] === "c" ? partes[1] : undefined} leitor={leitor} />;
 
-  const catAtual = partes[0] === "c" ? partes[1] : "";
-
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-20 border-b border-borda bg-fundo/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+    <div className="min-h-dvh pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0">
+      <header className="sticky top-0 z-20 border-b border-borda bg-fundo/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+        <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
+          <button
+            onClick={alternarColuna}
+            aria-label={recolhida ? "Expandir menu" : "Recolher menu"}
+            className="hidden size-9 place-items-center rounded-full text-suave hover:bg-painel-2 hover:text-texto lg:grid"
+          >
+            <Icone nome="menu" />
+          </button>
           <a href="/" onClick={aoClicar("/")} className="shrink-0">
             <img src="/logo-claro.png" alt="Planeta Diário" className="h-8 dark:hidden" />
             <img src="/logo.png" alt="Planeta Diário" className="hidden h-8 dark:block" />
           </a>
-          <a
-            href="/reels"
-            onClick={aoClicar("/reels")}
-            className="ml-2 hidden items-center gap-1.5 rounded-full bg-marca px-3 py-1.5 text-sm font-semibold text-white sm:flex"
-          >
-            <Icone nome="producao" className="size-4" /> Reels
-          </a>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5">
             <button onClick={alternarTema} aria-label="Alternar tema" className="grid size-9 place-items-center rounded-full text-suave hover:bg-painel-2 hover:text-texto">
-              <Icone nome="lua" className="size-4 dark:hidden" />
-              <Icone nome="sol" className="hidden size-4 dark:block" />
+              <Icone nome="lua" className="size-[18px] dark:hidden" />
+              <Icone nome="sol" className="hidden size-[18px] dark:block" />
             </button>
+            {leitor?.admin && (
+              <a href="/painel" className="hidden rounded-full bg-texto px-3 py-1.5 text-sm font-semibold text-fundo sm:block">Painel</a>
+            )}
             <BotaoConta leitor={leitor} />
-            <button onClick={() => setMenu(true)} aria-label="Abrir menu" className="grid size-9 place-items-center rounded-full hover:bg-painel-2 lg:hidden">
-              <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-            </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2 text-sm [scrollbar-width:none]">
-          <a href="/" onClick={aoClicar("/")} className={`shrink-0 rounded-full px-3 py-1 ${!catAtual && partes.length === 0 ? "bg-texto text-fundo" : "text-suave hover:text-texto"}`}>
-            Últimas
-          </a>
-          {CATEGORIAS.map((c) => (
-            <a
-              key={c.slug}
-              href={`/c/${c.slug}`}
-              onClick={aoClicar(`/c/${c.slug}`)}
-              className={`shrink-0 rounded-full px-3 py-1 ${catAtual === c.slug ? "bg-texto text-fundo" : "text-suave hover:text-texto"}`}
-            >
-              {c.label}
-            </a>
-          ))}
-        </nav>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <main className="min-w-0">{pagina}</main>
-        <aside className="hidden lg:block">
-          <div className="sticky top-32 max-h-[calc(100dvh-9rem)] overflow-y-auto pb-6 [scrollbar-width:thin]">
-            <MenuLateral leitor={leitor} caminho={caminho} />
-          </div>
+      <div className="flex">
+        {/* coluna esquerda recolhível (desktop) */}
+        <aside className={`sticky top-14 hidden h-[calc(100dvh-3.5rem)] shrink-0 overflow-y-auto border-r border-borda px-2 py-4 transition-[width] [scrollbar-width:thin] lg:block ${recolhida ? "w-[72px]" : "w-60"}`}>
+          <ColunaEsquerda caminho={caminho} leitor={leitor} recolhida={recolhida} />
         </aside>
+
+        <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-8 px-4 py-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <main className="min-w-0">{pagina}</main>
+          <aside className="hidden xl:block">
+            <div className="sticky top-[4.75rem] max-h-[calc(100dvh-6rem)] overflow-y-auto pb-6 [scrollbar-width:thin]">
+              <ColunaDireita leitor={leitor} />
+            </div>
+          </aside>
+        </div>
       </div>
 
-      {/* menu lateral no celular: gaveta pela direita */}
-      {menu && (
-        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMenu(false)}>
-          <div className="absolute inset-0 bg-black/50" />
-          <div onClick={(e) => e.stopPropagation()} className="absolute inset-y-0 right-0 w-[86%] max-w-sm overflow-y-auto bg-fundo p-4 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <b>Menu</b>
-              <button onClick={() => setMenu(false)} aria-label="Fechar menu" className="grid size-9 place-items-center rounded-full hover:bg-painel-2">✕</button>
-            </div>
-            <MenuLateral leitor={leitor} caminho={caminho} aoNavegar={() => setMenu(false)} />
-          </div>
-        </div>
-      )}
-
-      <footer className="mt-10 border-t border-borda">
+      <footer className="hidden border-t border-borda lg:block">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-suave">
           <p>© {new Date().getFullYear()} Planeta Diário — tudo o que acontece no mundo, em vídeo.</p>
           <a href="/assinar" onClick={aoClicar("/assinar")} className="font-medium text-marca">Seja assinante</a>
         </div>
       </footer>
 
-      {/* atalho para o modo Reels no celular */}
-      <a
-        href="/reels"
-        onClick={aoClicar("/reels")}
-        className="fixed bottom-5 right-5 z-20 flex items-center gap-2 rounded-full bg-marca px-4 py-3 text-sm font-semibold text-white shadow-lg sm:hidden"
-      >
-        <Icone nome="producao" className="size-4" /> Reels
-      </a>
+      {/* barra inferior estilo app (celular/tablet) */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-borda bg-fundo/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+        <AbaApp ativo={partes.length === 0} icone="inicio" rotulo="Início" onClick={() => navegar("/")} />
+        <AbaApp ativo={false} icone="reels" rotulo="Reels" onClick={() => navegar("/reels")} />
+        <AbaApp ativo={gaveta} icone="categorias" rotulo="Explorar" onClick={() => setGaveta(true)} />
+        <AbaApp
+          ativo={partes[0] === "conta" || partes[0] === "assinar"}
+          icone="usuario"
+          rotulo={leitor ? "Conta" : "Entrar"}
+          onClick={() => (leitor ? navegar("/conta") : entrarComGoogle())}
+        />
+      </nav>
+
+      {/* gaveta "Explorar" (celular) */}
+      {gaveta && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setGaveta(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-y-0 right-0 w-[88%] max-w-sm overflow-y-auto bg-fundo px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))] shadow-2xl"
+          >
+            <div className="mb-3 flex items-center justify-between px-2">
+              <b>Explorar</b>
+              <button onClick={() => setGaveta(false)} aria-label="Fechar" className="grid size-9 place-items-center rounded-full hover:bg-painel-2">
+                <Icone nome="fechar" />
+              </button>
+            </div>
+            <ColunaEsquerda caminho={caminho} leitor={leitor} recolhida={false} aoNavegar={() => setGaveta(false)} />
+            <div className="mt-5">
+              <ColunaDireita leitor={leitor} aoNavegar={() => setGaveta(false)} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function AbaApp({ ativo, icone, rotulo, onClick }: { ativo: boolean; icone: string; rotulo: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${ativo ? "text-marca" : "text-suave"}`}>
+      <Icone nome={icone} className="size-[22px]" />
+      {rotulo}
+    </button>
   );
 }
 
@@ -125,21 +152,16 @@ function BotaoConta({ leitor }: { leitor: Leitor | null | undefined }) {
   if (leitor === undefined) return <span className="size-9" />;
   if (!leitor)
     return (
-      <button onClick={() => entrarComGoogle()} className="flex items-center gap-2 rounded-full border border-borda bg-painel px-3 py-1.5 text-sm font-medium hover:bg-painel-2">
+      <button onClick={() => entrarComGoogle()} className="hidden items-center gap-2 rounded-full border border-borda bg-painel px-3 py-1.5 text-sm font-medium hover:bg-painel-2 sm:flex">
         <LogoGoogle /> Entrar
       </button>
     );
   return (
-    <>
-    {leitor.admin && (
-      <a href="/painel" className="rounded-full bg-texto px-3 py-1.5 text-sm font-semibold text-fundo">Painel</a>
-    )}
-    <a href="/conta" onClick={aoClicar("/conta")} className="flex items-center gap-2 rounded-full border border-borda bg-painel py-1 pl-1 pr-3 text-sm hover:bg-painel-2">
+    <a href="/conta" onClick={aoClicar("/conta")} className="flex items-center gap-2 rounded-full border border-borda bg-painel p-1 text-sm hover:bg-painel-2 sm:pr-3">
       <Avatar nome={leitor.nome} url={leitor.avatar} />
       <span className="hidden max-w-28 truncate sm:inline">{leitor.nome.split(" ")[0]}</span>
       {leitor.assinante && <SeloAssinante />}
     </a>
-    </>
   );
 }
 

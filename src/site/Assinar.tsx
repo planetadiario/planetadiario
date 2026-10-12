@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import Icone from "../Icone";
 import QRCode from "qrcode";
 import { supabase } from "../supabase";
 import { aoClicar, apiSite, entrarComGoogle, type Leitor } from "./base";
 import { LogoGoogle } from "./Site";
 
 const BENEFICIOS = [
-  ["⚡", "Notícias antes", "Veja as notícias antes de saírem no Facebook e no Instagram."],
-  ["🔒", "Conteúdo exclusivo", "Vídeos e matérias só para assinantes."],
-  ["🚫", "Sem anúncios", "Leia e assista sem nenhuma propaganda."],
-  ["🏆", "Selo Pro e pontos", "Selo nos comentários, +100 pontos na assinatura e pontos em dobro."],
+  ["raio", "Notícias antes", "Veja as notícias antes de saírem no Facebook e no Instagram."],
+  ["cadeado", "Conteúdo exclusivo", "Vídeos e matérias só para assinantes."],
+  ["proibido", "Sem anúncios", "Leia e assista sem nenhuma propaganda."],
+  ["trofeu", "Selo Pro e pontos", "Selo nos comentários, +100 pontos na assinatura e pontos em dobro."],
 ];
 
 export default function Assinar({ leitor }: { leitor: Leitor | null | undefined }) {
@@ -64,7 +65,7 @@ export default function Assinar({ leitor }: { leitor: Leitor | null | undefined 
         <ul className="mt-6 flex flex-col gap-4">
           {BENEFICIOS.map(([i, t, d]) => (
             <li key={t} className="flex gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-marca/10 text-lg">{i}</span>
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-marca/10 text-marca"><Icone nome={i} /></span>
               <span>
                 <b className="block">{t}</b>
                 <span className="text-sm text-suave">{d}</span>
@@ -84,7 +85,7 @@ export default function Assinar({ leitor }: { leitor: Leitor | null | undefined 
           </div>
         ) : status === "ativa" ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <p className="text-4xl">🎉</p>
+            <span className="grid size-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-500"><Icone nome="checkCirculo" className="size-8" /></span>
             <p className="text-xl font-bold">Assinatura ativa!</p>
             <p className="text-sm text-suave">Você ganhou 100 pontos. Redirecionando…</p>
           </div>
@@ -96,7 +97,7 @@ export default function Assinar({ leitor }: { leitor: Leitor | null | undefined 
               onClick={() => navigator.clipboard.writeText(pix.codigo).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); })}
               className="w-full rounded-full bg-marca py-2.5 font-semibold text-white"
             >
-              {copiado ? "Código copiado ✓" : "Copiar PIX copia e cola"}
+              {copiado ? "Código copiado" : "Copiar PIX copia e cola"}
             </button>
             <p className="flex items-center gap-2 text-sm text-suave">
               <span className="size-2 animate-pulse rounded-full bg-amber-500" /> Aguardando o pagamento… a confirmação é automática.
@@ -104,7 +105,7 @@ export default function Assinar({ leitor }: { leitor: Leitor | null | undefined 
           </div>
         ) : leitor.assinante ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <p className="text-lg font-bold">Você já é assinante 💛</p>
+            <p className="flex items-center gap-2 text-lg font-bold"><Icone nome="estrela" className="size-5 text-amber-400" /> Você já é assinante</p>
             <p className="text-sm text-suave">Válida até {new Date(leitor.fimAssinatura!).toLocaleDateString("pt-BR")}. Pague de novo para somar mais 30 dias.</p>
             <FormPix cpf={cpf} setCpf={setCpf} tel={tel} setTel={setTel} gerar={gerar} status={status} erro={erro} rotulo="Renovar por mais 30 dias" />
           </div>

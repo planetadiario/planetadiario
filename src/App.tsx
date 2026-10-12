@@ -39,6 +39,7 @@ export default function App() {
   const [sessao, setSessao] = useState<Session | null | undefined>(undefined);
   const [aba, setAba] = useState<Aba>(() => (ABAS.some((a) => a.id === ler("aba")) ? (ler("aba") as Aba) : "visao"));
   const [escuro, setEscuro] = useState(() => document.documentElement.classList.contains("dark"));
+  const [recolhido, setRecolhido] = useState(() => ler("menu") === "recolhido");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSessao(data.session));
@@ -49,6 +50,10 @@ export default function App() {
   function trocar(a: Aba) {
     setAba(a);
     gravar("aba", a);
+  }
+  function alternarMenu() {
+    setRecolhido(!recolhido);
+    gravar("menu", recolhido ? "aberto" : "recolhido");
   }
   function alternarTema() {
     const novo = !escuro;
@@ -62,33 +67,50 @@ export default function App() {
   const atual = ABAS.find((a) => a.id === aba)!;
 
   return (
-    <div className="min-h-dvh pb-16 md:pb-0 md:pl-60">
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-borda bg-painel md:inset-y-0 md:left-0 md:right-auto md:w-60 md:flex-col md:border-r md:border-t-0 md:px-3 md:py-5">
-        <div className="mb-8 hidden items-center gap-2 px-3 md:flex">
-          <img src="/logo-claro.png" alt="Planeta Diário" className="h-9 dark:hidden" />
-          <img src="/logo.png" alt="Planeta Diário" className="hidden h-9 dark:block" />
+    <div className={`min-h-dvh pb-[calc(64px+env(safe-area-inset-bottom))] transition-[padding] md:pb-0 ${recolhido ? "md:pl-[72px]" : "md:pl-60"}`}>
+      <nav
+        className={`fixed inset-x-0 bottom-0 z-20 flex border-t border-borda bg-painel pb-[env(safe-area-inset-bottom)] transition-[width] md:inset-y-0 md:left-0 md:right-auto md:flex-col md:border-r md:border-t-0 md:px-3 md:py-5 ${
+          recolhido ? "md:w-[72px]" : "md:w-60"
+        }`}
+      >
+        <div className={`mb-8 hidden items-center gap-2 md:flex ${recolhido ? "justify-center" : "px-3"}`}>
+          {recolhido ? (
+            <img src="/icone-192.png" alt="Planeta Diário" className="size-9 rounded-full" />
+          ) : (
+            <>
+              <img src="/logo-claro.png" alt="Planeta Diário" className="h-9 dark:hidden" />
+              <img src="/logo.png" alt="Planeta Diário" className="hidden h-9 dark:block" />
+            </>
+          )}
         </div>
         {ABAS.map((a) => (
           <button
             key={a.id}
             onClick={() => trocar(a.id)}
-            className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition md:mb-1 md:flex-none md:flex-row md:gap-3 md:rounded-lg md:px-3 md:py-2.5 md:text-sm ${
+            title={recolhido ? a.nome : undefined}
+            className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] transition md:mb-1 md:flex-none md:flex-row md:gap-3 md:rounded-lg md:px-3 md:py-2.5 md:text-sm ${recolhido ? "md:justify-center" : ""} ${
               aba === a.id ? "font-semibold text-marca md:bg-marca/10" : "text-suave hover:text-texto md:hover:bg-painel-2"
             }`}
           >
             <Icone nome={a.icone} />
-            <span className={a.id === "moldes" || a.id === "ajustes" ? "hidden sm:inline" : ""}>{a.nome}</span>
+            <span className={`${a.id === "moldes" || a.id === "ajustes" ? "hidden sm:inline" : ""} ${recolhido ? "md:hidden" : ""}`}>{a.nome}</span>
           </button>
         ))}
-        <div className="mt-auto hidden px-3 text-xs text-suave md:block">
-          <p className="truncate">{sessao.user.email}</p>
-          <button onClick={() => supabase.auth.signOut()} className="mt-2 flex items-center gap-2 hover:text-texto">
-            <Icone nome="sair" className="size-4" /> Sair
+        <div className={`mt-auto hidden flex-col gap-2 text-xs text-suave md:flex ${recolhido ? "items-center" : "px-3"}`}>
+          {!recolhido && <p className="truncate">{sessao.user.email}</p>}
+          <a href="/" title="Ver site" className="flex items-center gap-2 hover:text-texto">
+            <Icone nome="globo" className="size-4" /> {!recolhido && "Ver site"}
+          </a>
+          <button onClick={() => supabase.auth.signOut()} title="Sair" className="flex items-center gap-2 hover:text-texto">
+            <Icone nome="sair" className="size-4" /> {!recolhido && "Sair"}
+          </button>
+          <button onClick={alternarMenu} title={recolhido ? "Expandir menu" : "Recolher menu"} className="mt-2 flex items-center gap-2 hover:text-texto">
+            <Icone nome={recolhido ? "expandir" : "recolher"} className="size-4" /> {!recolhido && "Recolher"}
           </button>
         </div>
       </nav>
 
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-borda bg-fundo/85 px-4 py-3 backdrop-blur md:px-8">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-borda bg-fundo/85 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur md:px-8">
         <h1 className="text-lg font-semibold">{atual.nome}</h1>
         <button
           onClick={alternarTema}

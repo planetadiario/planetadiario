@@ -1,0 +1,31 @@
+{
+  "name": "Planeta Diário",
+  "short_name": "Planeta Diário",
+  "description": "Tudo o que acontece no Brasil e no mundo, em vídeo.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icone-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icone-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

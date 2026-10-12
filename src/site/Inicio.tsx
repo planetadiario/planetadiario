@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Icone from "../Icone";
-import { aoClicar, buscarNoticias, nomeCategoria, quando, type Leitor, type Noticia } from "./base";
+import { aoClicar, buscarNoticias, nomeCategoria, quando, resumoSite, type Leitor, type Noticia } from "./base";
 
 export default function Inicio({ categoria, leitor }: { categoria?: string; leitor: Leitor | null | undefined }) {
   const [itens, setItens] = useState<Noticia[] | null>(null);
@@ -39,7 +39,7 @@ export default function Inicio({ categoria, leitor }: { categoria?: string; leit
           <section>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-bold">Em alta agora</h2>
-              <a href="/reels" onClick={aoClicar("/reels")} className="text-sm font-medium text-marca">Ver em modo Reels →</a>
+              <a href="/reels" onClick={aoClicar("/reels")} className="flex items-center gap-1 text-sm font-medium text-marca">Ver em modo Reels <Icone nome="seta" className="size-4" /></a>
             </div>
             <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
               {emAlta.map((n) => (
@@ -93,7 +93,7 @@ function Destaque({ n }: { n: Noticia }) {
           <span className="text-white/60">{quando(n.site_publicado_em)}</span>
         </div>
         <h2 className="text-2xl font-bold leading-tight sm:text-3xl">{n.manchete}</h2>
-        {n.legenda && <p className="line-clamp-3 text-white/75">{n.legenda.split("\n")[0]}</p>}
+        {n.legenda && <p className="line-clamp-3 text-white/75">{resumoSite(n.legenda)}</p>}
       </div>
     </a>
   );
@@ -102,10 +102,8 @@ function Destaque({ n }: { n: Noticia }) {
 function CartaoReel({ n }: { n: Noticia }) {
   return (
     <a href={`/reels/${n.slug}`} onClick={aoClicar(`/reels/${n.slug}`)} className="group relative aspect-[9/16] w-40 shrink-0 snap-start overflow-hidden rounded-xl bg-black sm:w-44">
-      {n.thumb_url && <img src={n.thumb_url} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
-      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2.5 pt-10">
-        <span className="line-clamp-3 text-xs font-semibold leading-snug text-white">{n.manchete}</span>
-      </span>
+      {/* a capa já traz a manchete gravada pelo molde */}
+      {n.thumb_url && <img src={n.thumb_url} alt={n.manchete} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
       <span className="absolute left-2 top-2 flex gap-1"><Selos n={n} /></span>
     </a>
   );
@@ -134,16 +132,22 @@ function CartaoLista({ n }: { n: Noticia }) {
   );
 }
 
+const BENEFICIOS_CURTOS = [
+  ["raio", "Notícias antes das redes sociais"],
+  ["cadeado", "Conteúdo exclusivo"],
+  ["proibido", "Site sem anúncios"],
+  ["trofeu", "Selo Pro e pontos em dobro no ranking"],
+];
+
 export function ChamadaAssinatura() {
   return (
     <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-marca to-[#9b0b12] p-5 text-white">
       <p className="text-xs font-bold uppercase tracking-wider text-white/80">Planeta Diário Pro</p>
       <p className="mt-1 text-xl font-bold leading-tight">Saiba antes de todo mundo</p>
       <ul className="mt-3 flex flex-col gap-1.5 text-sm text-white/90">
-        <li>⚡ Notícias antes das redes sociais</li>
-        <li>🔒 Conteúdo exclusivo</li>
-        <li>🚫 Site sem anúncios</li>
-        <li>🏆 Selo Pro e pontos em dobro no ranking</li>
+        {BENEFICIOS_CURTOS.map(([icone, texto]) => (
+          <li key={texto} className="flex items-center gap-2"><Icone nome={icone} className="size-4 shrink-0" />{texto}</li>
+        ))}
       </ul>
       <a href="/assinar" onClick={aoClicar("/assinar")} className="mt-4 block rounded-full bg-white py-2 text-center text-sm font-bold text-marca">
         Assinar agora

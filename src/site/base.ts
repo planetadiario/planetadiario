@@ -146,3 +146,24 @@ export async function apiSite<T>(caminho: string, init: RequestInit = {}): Promi
   if (!r.ok) throw new Error(corpo.erro ?? `Erro ${r.status}`);
   return corpo as T;
 }
+
+/** Remove emojis dos textos da IA (as legendas das redes usam emojis; o site, não) */
+export function semEmoji(texto: string) {
+  return texto
+    .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}]/gu, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/^[ \t]+/gm, "")
+    .trim();
+}
+
+/** Parágrafos do artigo/legenda para o site: sem a linha "Siga", sem créditos/hashtags e sem emojis */
+export function paragrafosSite(texto: string) {
+  return texto
+    .split(/\n\s*\n/)
+    .filter((p) => !/^(📌|🎥|#)/u.test(p.trim()) && !/^Siga a Planeta Di[aá]rio/i.test(semEmoji(p)))
+    .map(semEmoji)
+    .filter(Boolean);
+}
+
+/** Primeira linha da legenda, sem emojis */
+export const resumoSite = (legenda: string) => semEmoji(legenda.split("\n")[0]);

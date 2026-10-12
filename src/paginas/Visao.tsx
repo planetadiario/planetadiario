@@ -208,7 +208,7 @@ function Kpi({ icone, rotulo, valor, antes }: { icone: string; rotulo: string; v
         <span className="text-2xl font-semibold tabular-nums">{numeroCurto(valor) || "0"}</span>
         {delta !== null && (
           <span className={`text-xs font-medium ${delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-            {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)}%
+            <span className="flex items-center gap-0.5"><Icone nome={delta >= 0 ? "cima" : "baixo"} className="size-3.5" />{Math.abs(delta)}%</span>
           </span>
         )}
       </div>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import Icone from "../Icone";
 import { supabase } from "../supabase";
 import {
-  api, BANDEIRA, FONTE, numeroCurto, tempoAtras,
+  api, FONTE, numeroCurto, tempoAtras,
   type Categoria, type Tendencia, type VideoEncontrado,
 } from "../api";
 
@@ -87,9 +88,9 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
         <button
           onClick={coletarAgora}
           disabled={coletando}
-          className="rounded-lg border border-borda px-3 py-2 text-sm hover:border-globo disabled:opacity-60"
+          className="flex items-center gap-2 rounded-lg border border-borda px-3 py-2 text-sm hover:border-globo disabled:opacity-60"
         >
-          {coletando ? "Coletando…" : "↻ Coletar agora"}
+          <Icone nome="recarregar" className={`size-4 ${coletando ? "animate-spin" : ""}`} /> {coletando ? "Coletando…" : "Coletar agora"}
         </button>
       </header>
 
@@ -110,7 +111,7 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
       <div className="mb-5 flex flex-wrap gap-2 text-sm">
         {(["", "videos", "assuntos"] as const).map((t) => (
           <Filtro key={t} ativo={tipo === t} onClick={() => setTipo(t)}>
-            {t === "" ? "Tudo" : t === "videos" ? "🎥 Vídeos" : "🔎 Assuntos"}
+            <span className="flex items-center gap-1.5">{t === "videos" && <Icone nome="video" className="size-3.5" />}{t === "assuntos" && <Icone nome="busca" className="size-3.5" />}{t === "" ? "Tudo" : t === "videos" ? "Vídeos" : "Assuntos"}</span>
           </Filtro>
         ))}
         <span className="mx-1 w-px bg-borda" />
@@ -118,7 +119,7 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
           <Filtro key={j} ativo={janela === j} onClick={() => setJanela(j)}>{j}</Filtro>
         ))}
         <span className="mx-1 w-px bg-borda" />
-        <Filtro ativo={soBrasil} onClick={() => setSoBrasil(!soBrasil)}>🇧🇷 Só Brasil</Filtro>
+        <Filtro ativo={soBrasil} onClick={() => setSoBrasil(!soBrasil)}>Só Brasil</Filtro>
       </div>
 
       {carregando ? (
@@ -145,7 +146,7 @@ export default function Radar({ irParaProducao }: { irParaProducao: () => void }
                 <div className="flex items-center gap-2 text-xs text-suave">
                   <Score valor={t.analisado ? t.score : null} />
                   <span className="rounded bg-marca px-1.5 py-0.5 font-bold text-white">{nomeCat(t.categoria)}</span>
-                  <span>{t.pais ? BANDEIRA[t.pais] ?? t.pais : "🌐"}</span>
+                  <span className="flex items-center gap-1 rounded bg-painel-2 px-1.5 py-0.5 font-semibold"><Icone nome="globo" className="size-3" />{t.pais ?? "—"}</span>
                   <span>{FONTE[t.fonte] ?? t.fonte}</span>
                   <span className="ml-auto">{tempoAtras(t.detectado_em)}</span>
                 </div>
@@ -201,7 +202,7 @@ function Filtro({ ativo, onClick, children }: { ativo: boolean; onClick: () => v
 function Score({ valor }: { valor: number | null }) {
   if (valor == null) return <span className="rounded bg-borda px-1.5 py-0.5">IA…</span>;
   const cor = valor >= 80 ? "bg-green-500" : valor >= 60 ? "bg-amber-500" : "bg-slate-600";
-  return <span className={`rounded px-1.5 py-0.5 font-bold text-white ${cor}`}>🔥 {valor}</span>;
+  return <span className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-bold text-white ${cor}`}><Icone nome="fogo" className="size-3" />{valor}</span>;
 }
 
 function BuscaVideos({
@@ -233,7 +234,7 @@ function BuscaVideos({
       <div onClick={(e) => e.stopPropagation()} className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-borda bg-painel p-4 sm:rounded-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-bold">Vídeos sobre: {tendencia.titulo_pt ?? tendencia.titulo}</h3>
-          <button onClick={fechar} className="text-suave">✕</button>
+          <button onClick={fechar} aria-label="Fechar" className="text-suave hover:text-texto"><Icone nome="fechar" /></button>
         </div>
         <form onSubmit={(e) => { e.preventDefault(); buscar(q); }} className="mb-3 flex gap-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} className="flex-1 rounded-lg border border-borda bg-fundo px-3 py-2 text-sm" />

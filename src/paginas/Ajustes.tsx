@@ -26,7 +26,7 @@ export default function Ajustes() {
   async function gravar<K extends keyof Cfg>(chave: K, valor: Cfg[K]) {
     setCfg((c) => (c ? { ...c, [chave]: valor } : c));
     const { error } = await supabase.from("config").upsert({ chave, valor });
-    setSalvo(error ? `Erro: ${error.message}` : "Salvo ✓");
+    setSalvo(error ? `Erro: ${error.message}` : "Salvo");
     setTimeout(() => setSalvo(""), 2000);
   }
 
@@ -60,7 +60,7 @@ export default function Ajustes() {
           </button>
         </label>
         <label className="mb-4 block">
-          <span className="flex justify-between text-sm"><span>Pontuação mínima (🔥)</span><b>{cfg.score_minimo_auto}</b></span>
+          <span className="flex justify-between text-sm"><span>Pontuação mínima de viralização</span><b>{cfg.score_minimo_auto}</b></span>
           <input
             type="range" min={50} max={95} step={5} value={cfg.score_minimo_auto}
             onChange={(e) => gravar("score_minimo_auto", Number(e.target.value))}

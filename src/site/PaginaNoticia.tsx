@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import Icone from "../Icone";
 import { supabase } from "../supabase";
-import { aoClicar, entrarComGoogle, nomeCategoria, quando, type Leitor, type Noticia } from "./base";
+import { aoClicar, entrarComGoogle, nomeCategoria, paragrafosSite, quando, type Leitor, type Noticia } from "./base";
 import { Avatar, LogoGoogle, SeloAssinante } from "./Site";
 import { ChamadaAssinatura, Selos } from "./Inicio";
 
@@ -27,7 +28,7 @@ export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: 
     );
 
   const url = `${window.location.origin}/n/${n.slug}`;
-  const paragrafos = (n.artigo ?? n.legenda ?? "").split(/\n\s*\n/).filter((p) => !/^(📌|🎥|#)/u.test(p.trim()));
+  const paragrafos = paragrafosSite(n.artigo ?? n.legenda ?? "");
 
   return (
     <article className="grid gap-8 md:grid-cols-[300px_minmax(0,1fr)]">
@@ -40,7 +41,7 @@ export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: 
               {n.thumb_url && <img src={n.thumb_url} alt="" className="h-full w-full object-cover blur-md" />}
               <div className="absolute inset-0 grid place-items-center bg-black/50 p-6 text-center text-white">
                 <div>
-                  <p className="text-lg font-bold">🔒 Vídeo exclusivo</p>
+                  <p className="flex items-center justify-center gap-2 text-lg font-bold"><Icone nome="cadeado" /> Vídeo exclusivo</p>
                   <p className="mt-1 text-sm text-white/80">Disponível para assinantes Planeta Diário Pro.</p>
                 </div>
               </div>
@@ -90,7 +91,7 @@ function Compartilhar({ url, titulo }: { url: string; titulo: string }) {
         onClick={() => navigator.clipboard.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); })}
         className="rounded-full border border-borda px-4 py-2 font-semibold hover:bg-painel-2"
       >
-        {copiado ? "Link copiado ✓" : "Copiar link"}
+        {copiado ? "Link copiado" : "Copiar link"}
       </button>
     </div>
   );
@@ -106,7 +107,7 @@ interface Comentario {
   assinante: boolean;
 }
 
-export function Comentarios({ noticiaId, leitor }: { noticiaId: string; leitor: Leitor | null | undefined }) {
+export function Comentarios({ noticiaId, leitor, compacto = false }: { noticiaId: string; leitor: Leitor | null | undefined; compacto?: boolean }) {
   const [lista, setLista] = useState<Comentario[]>([]);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -138,7 +139,7 @@ export function Comentarios({ noticiaId, leitor }: { noticiaId: string; leitor: 
   }
 
   return (
-    <section className="mt-10 max-w-2xl border-t border-borda pt-6">
+    <section className={compacto ? "" : "mt-10 max-w-2xl border-t border-borda pt-6"}>
       <h2 className="mb-4 text-lg font-bold">Comentários ({lista.length})</h2>
       {leitor ? (
         <form onSubmit={enviar} className="mb-6 flex gap-3">

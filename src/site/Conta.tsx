@@ -45,7 +45,7 @@ export default function Conta({ leitor }: { leitor: Leitor | null | undefined })
           <p className="mt-2 text-sm text-suave">
             Válida até {new Date(leitor.fimAssinatura!).toLocaleDateString("pt-BR")} ({dias} {dias === 1 ? "dia" : "dias"}).
           </p>
-          <a href="/assinar" onClick={aoClicar("/assinar")} className="mt-3 inline-block text-sm font-semibold text-marca">Renovar →</a>
+          <a href="/assinar" onClick={aoClicar("/assinar")} className="mt-3 inline-block text-sm font-semibold text-marca">Renovar</a>
         </div>
       ) : (
         <ChamadaAssinatura />
