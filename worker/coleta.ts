@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Bindings, Tendencia } from "./env";
 import { buscarVideos, dailymotion, googleTrends, youtubeEmAlta } from "./coletores";
 import { bluesky, noticiasPais, telegram } from "./fontes-extras";
-import { analisarTendencias } from "./ia";
+import { analisarTendencias, nvidiaJson } from "./ia";
 import { dispararRender } from "./github";
 import { metricasReel, seguidores } from "./facebook";
 
@@ -290,7 +290,45 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
 
   log.push(`piloto: melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
 
+  // assuntos e vídeos publicados nas últimas 24 h: nunca repetir o mesmo vídeo nem o mesmo assunto
+  const { data: recentes } = await db
+    .from("reels")
+    .select("origem_url, origem_titulo, manchete")
+    .not("status", "in", "(rejeitado,erro)")
+    .gte("criado_em", new Date(Date.now() - 24 * 3600_000).toISOString());
+  const assuntos = (recentes ?? []).map((r) => palavras(`${r.origem_titulo ?? ""} ${r.manchete ?? ""}`));
+  const manchetes = (recentes ?? []).map((r) => r.manchete ?? r.origem_titulo).filter(Boolean) as string[];
+  const repetidoPalavras = (titulo: string) => {
+    const p = palavras(titulo);
+    return assuntos.some((a) => parecido(p, a));
+  };
+  // a IA compara o assunto (pega "vazamento gta 6" x "Hackers ameaçam vazar GTA 6", inglês x português)
+  const NL = String.fromCharCode(10);
+  const repetido = async (titulo: string) => {
+    if (repetidoPalavras(titulo)) return true;
+    if (!manchetes.length) return false;
+    try {
+      const r = await nvidiaJson<{ repetido: boolean }>(
+        env,
+        "Você evita posts repetidos numa página de notícias. Responda só JSON.",
+        `Já publicamos hoje:${NL}${manchetes.map((m, i) => `${i + 1}. ${m}`).join(NL)}${NL}${NL}Novo candidato: "${titulo}"${NL}${NL}O candidato é sobre o MESMO fato/acontecimento de algum já publicado (mesmo que com outras palavras ou em outra língua)? Assuntos parecidos mas fatos diferentes NÃO são repetidos.`,
+        { type: "object", properties: { repetido: { type: "boolean" } }, required: ["repetido"] },
+      );
+      return r.repetido === true;
+    } catch {
+      return false;
+    }
+  };
+
   for (const t of candidatos) {
+    if (await repetido(`${t.titulo_pt ?? t.titulo}`)) {
+      await db.from("tendencias").update({ usado: true }).eq("id", t.id);
+      log.push(`piloto: assunto já publicado — ${t.titulo_pt ?? t.titulo}`);
+      continue;
+    }
+    // reserva a tendência (se outra coleta já pegou, pula)
+    const { data: reservada } = await db.from("tendencias").update({ usado: true }).eq("id", t.id).eq("usado", false).select("id");
+    if (!reservada?.length) continue;
     let videoUrl: string | null = t.video_url;
     let autor = t.extra?.autor ?? null;
     if (!videoUrl) {
@@ -301,8 +339,11 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
       videoUrl = videos[0]?.video_url ?? null;
       autor = videos[0]?.extra?.autor ?? null;
     }
-    await db.from("tendencias").update({ usado: true }).eq("id", t.id);
     if (!videoUrl) continue;
+    if ((recentes ?? []).some((r) => r.origem_url === videoUrl)) {
+      log.push(`piloto: vídeo já usado — ${videoUrl}`);
+      continue;
+    }
 
     const { data: reel, error } = await db
       .from("reels")
@@ -315,7 +356,11 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
       })
       .select("id")
       .single();
-    if (error) return log.push(`piloto: ${error.message}`);
+    if (error) {
+      // índice único: o mesmo vídeo já está em outro Reel (corrida entre coletas)
+      if (error.code === "23505") continue;
+      return log.push(`piloto: ${error.message}`);
+    }
     // URGENTE: publica sozinho se estiver ligado em Ajustes; senão espera aprovação (risco de informação falsa)
     await dispararRender(env, reel.id, t.categoria !== "urgente" || cfg.urgente_automatico === true);
     return log.push(`piloto: reel ${reel.id} (${t.titulo_pt ?? t.titulo})`);
@@ -383,4 +428,26 @@ async function buscarVideosQuentes(env: Bindings, db: SupabaseClient, log: strin
       .eq("id", t.id);
     log.push(`vídeo para "${(t.titulo_pt ?? t.titulo).slice(0, 50)}": ${melhor ? melhor.video_url : "nenhum"}`);
   }
+}
+
+// palavras que identificam o assunto (sem acentos, sem palavras curtas e comuns)
+const COMUNS = new Set("para pela pelo com sem que dos das nos nas uma uns umas the and for with from after over this that into about como mais apos sobre video videos novo nova diz faz".split(" "));
+function palavras(texto: string) {
+  return new Set(
+    texto
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/[^a-z0-9]+/)
+      .filter((w) => (w.length >= 3 || /^\d+$/.test(w)) && !COMUNS.has(w)),
+  );
+}
+
+/** mesmo assunto: muitas palavras em comum (ex.: "vazamento gta 6" x "hackers ameaçam vazar gta 6") */
+function parecido(a: Set<string>, b: Set<string>) {
+  if (!a.size || !b.size) return false;
+  let comuns = 0;
+  for (const w of a) if (b.has(w)) comuns++;
+  const menor = Math.min(a.size, b.size);
+  return comuns >= 2 && comuns / menor >= 0.5;
 }
