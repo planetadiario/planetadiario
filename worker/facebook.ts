@@ -88,6 +88,7 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
       fb_reels_total_plays: "fb_views_total",
       post_video_avg_time_watched: "fb_tempo_medio_ms",
       post_video_followers: "fb_novos_seguidores",
+      post_video_view_time: "fb_tempo_total_ms", // minutos assistidos (meta de monetização)
     };
     for (const [metrica, campo] of Object.entries(FB_METRICAS)) {
       try {
@@ -109,7 +110,7 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
     m.ig_comentarios = r.comments_count ?? 0;
     try {
       const ins = (await fbJson(
-        await fetch(`${g}/${igMediaId}/insights?metric=views,reach,saved,shares,ig_reels_avg_watch_time&access_token=${t}`),
+        await fetch(`${g}/${igMediaId}/insights?metric=views,reach,saved,shares,ig_reels_avg_watch_time,ig_reels_video_view_total_time&access_token=${t}`),
       )) as { data: { name: string; values: { value: number }[] }[] };
       for (const d of ins.data ?? []) {
         const v = Number(d.values?.[0]?.value ?? 0);
@@ -118,6 +119,7 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
         if (d.name === "saved") m.ig_salvos = v;
         if (d.name === "shares") m.ig_compartilhamentos = v;
         if (d.name === "ig_reels_avg_watch_time") m.ig_tempo_medio_ms = v;
+        if (d.name === "ig_reels_video_view_total_time") m.ig_tempo_total_ms = v;
       }
     } catch (e) {
       avisos.push(`ig insights: ${e instanceof Error ? e.message : e}`);
@@ -125,6 +127,15 @@ export async function metricasReel(env: Bindings, fbVideoId: string | null, igMe
   }
   if (avisos.length) m.avisos = avisos.join(" | ");
   return m;
+}
+
+/** Seguidores atuais da página e do Instagram */
+export async function seguidores(env: Bindings) {
+  const g = `https://graph.facebook.com/${env.FB_GRAPH_VERSION}`;
+  const r = (await fbJson(
+    await fetch(`${g}/${env.FB_PAGE_ID}?fields=followers_count,fan_count,instagram_business_account{followers_count}&access_token=${env.FB_PAGE_TOKEN}`),
+  )) as { followers_count?: number; fan_count?: number; instagram_business_account?: { followers_count?: number } };
+  return { fb: r.followers_count ?? r.fan_count ?? 0, ig: r.instagram_business_account?.followers_count ?? 0 };
 }
 
 /** Apaga um post do Instagram */

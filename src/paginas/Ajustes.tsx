@@ -27,6 +27,9 @@ interface Cfg {
   intervalo_min_minutos?: number;
   cta_facebook?: string;
   cta_instagram?: string;
+  narracao?: { ativa: boolean; voz: string };
+  meta_posts_dia?: number;
+  horarios_pico?: [number, number][];
 }
 
 const CANAIS_TELEGRAM_PADRAO = ["Breaking911", "bnonews", "disclosetv", "insiderpaper", "wfwitness", "ClashReport", "WarMonitors", "metropoles", "cnnbrasil", "g1noticias"];
@@ -93,7 +96,10 @@ export default function Ajustes() {
             <Faixa rotulo="Nota mínima de viralização" valor={cfg.score_minimo_auto} min={50} max={95} passo={5} aoMudar={(v) => gravar("score_minimo_auto", v)} />
             <Faixa rotulo="Máximo de Reels por dia" valor={cfg.max_posts_dia} min={1} max={30} aoMudar={(v) => gravar("max_posts_dia", v)} />
             <Faixa rotulo="Intervalo mínimo entre posts (minutos)" valor={cfg.intervalo_min_minutos ?? 40} min={10} max={180} passo={5} aoMudar={(v) => gravar("intervalo_min_minutos", v)} />
-            <p className="text-xs text-suave">Assuntos URGENTES são montados automaticamente, mas esperam a sua aprovação em Produção.</p>
+            <Faixa rotulo="Meta mínima de posts por dia" valor={cfg.meta_posts_dia ?? 8} min={1} max={30} aoMudar={(v) => gravar("meta_posts_dia", v)} />
+            <p className="text-xs text-suave">
+              Publica só nos horários de pico ({(cfg.horarios_pico ?? [[7, 9], [11, 14], [17, 23]]).map(([a, b]) => `${a}h–${b}h`).join(", ")}). Se estiver atrás da meta do dia, aceita nota até 10 pontos menor. Assuntos URGENTES esperam a sua aprovação.
+            </p>
           </section>
         </div>
       )}
@@ -125,6 +131,26 @@ export default function Ajustes() {
 
       {aba === "reel" && (
         <div className="grid gap-5 xl:grid-cols-2">
+        <section className="cartao p-6 xl:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold">Narração em português + legendas</h3>
+              <p className="text-sm text-suave">A IA escreve, uma voz narra e as legendas entram no vídeo. Torna o conteúdo transformado (ajuda na monetização) e traduz vídeos de fora.</p>
+            </div>
+            <Chave ligada={!!cfg.narracao?.ativa} onClick={() => gravar("narracao", { ativa: !cfg.narracao?.ativa, voz: cfg.narracao?.voz ?? "cadu" })} />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            {["cadu", "jeff", "faber"].map((v) => (
+              <button
+                key={v}
+                onClick={() => gravar("narracao", { ativa: !!cfg.narracao?.ativa, voz: v })}
+                className={`rounded-lg border px-3 py-1.5 capitalize ${(cfg.narracao?.voz ?? "cadu") === v ? "border-marca bg-marca/10 font-semibold text-marca" : "border-borda"}`}
+              >
+                Voz {v}
+              </button>
+            ))}
+          </div>
+        </section>
         <section className="cartao p-6">
           <h3 className="mb-1 font-semibold">Chamada no fim da legenda</h3>
           <p className="mb-3 text-sm text-suave">Entra em todo post, entre a legenda e as hashtags. Deixe vazio para não usar.</p>

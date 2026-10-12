@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import Icone from "../Icone";
 import { numeroCurto } from "../api";
+import MetasMonetizacao from "./MetasMonetizacao";
 
 interface Metricas {
   fb_curtidas: number;
@@ -111,6 +112,8 @@ export default function Visao() {
           ))}
         </div>
       </div>
+
+      <MetasMonetizacao />
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Kpi icone="producao" rotulo="Reels publicados" valor={d.atual.posts} antes={d.anterior.posts} />

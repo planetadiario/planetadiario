@@ -35,7 +35,13 @@ Você vai gerar:
    futebol e outros esportes → "esportes"; celebridades → "famosos"; crimes/segurança → "policia"; saúde → "saude";
    dinheiro/mercado → "economia"; fato grave de última hora → "urgente"; fato do Brasil sem tema específico → "noticias";
    fato internacional sem tema específico → "mundo"; vídeo inusitado que viralizou → "viral"; história tocante → "emocionante";
-   engraçado → "humor"; fato curioso → "curiosidades"."""
+   engraçado → "humor"; fato curioso → "curiosidades".
+6. narracao: o texto que um narrador de telejornal vai LER em voz alta sobre o vídeo, em português do Brasil:
+   - começa pelo fato mais impactante (o gancho tem que prender nos 2 primeiros segundos);
+   - 2 a 4 frases curtas, linguagem falada e natural, sem emoji, sem hashtag, sem siglas difíceis;
+   - explica o que aparece no vídeo e o contexto, traduzindo o que estiver em outra língua;
+   - respeite o limite de palavras informado ("limite_palavras_narracao");
+   - 100% fiel aos fatos, sem inventar nada."""
 
 CATEGORIAS = [
     "noticias", "urgente", "mundo", "esportes", "famosos", "curiosidades", "viral", "emocionante",
@@ -50,8 +56,9 @@ ESQUEMA = {
         "artigo": {"type": "string"},
         "hashtags": {"type": "array", "items": {"type": "string"}},
         "categoria": {"type": "string", "enum": CATEGORIAS},
+        "narracao": {"type": "string"},
     },
-    "required": ["manchete", "legenda", "artigo", "hashtags", "categoria"],
+    "required": ["manchete", "legenda", "artigo", "hashtags", "categoria", "narracao"],
     "additionalProperties": False,
 }
 

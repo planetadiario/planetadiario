@@ -87,6 +87,30 @@ app.post("/coletar", async (c) => c.json({ log: await coletar(c.env) }));
 
 app.post("/aprendizados", async (c) => c.json(await gerarAprendizados(c.env)));
 
+// metas de monetização: seguidores, minutos assistidos (60 dias) e Reels ativos (30 dias)
+app.get("/monetizacao", async (c) => {
+  const db = supa(c.env);
+  const desde60 = new Date(Date.now() - 60 * 86400_000).toISOString();
+  const desde30 = Date.now() - 30 * 86400_000;
+  const [hist, reels, cfg] = await Promise.all([
+    db.from("seguidores_historico").select("dia, fb, ig").order("dia", { ascending: false }).limit(60),
+    db.from("reels").select("publicado_em, metricas").eq("status", "publicado").gte("publicado_em", desde60),
+    db.from("config").select("valor").eq("chave", "metas_monetizacao").maybeSingle(),
+  ]);
+  const ms = (m: Record<string, unknown> | null, k: string) => Number(m?.[k] ?? 0);
+  const lista = reels.data ?? [];
+  const minFb = lista.reduce((s, r) => s + ms(r.metricas, "fb_tempo_total_ms"), 0) / 60000;
+  const minIg = lista.reduce((s, r) => s + ms(r.metricas, "ig_tempo_total_ms"), 0) / 60000;
+  return c.json({
+    metas: cfg.data?.valor ?? { seguidores: 5000, minutos_60d: 60000, reels_30d: 5 },
+    seguidores: hist.data?.[0] ?? null,
+    historico: (hist.data ?? []).reverse(),
+    minutos_60d: { fb: Math.round(minFb), ig: Math.round(minIg) },
+    reels_30d: lista.filter((r) => Date.parse(r.publicado_em) >= desde30).length,
+    reels_hoje: lista.filter((r) => new Date(r.publicado_em).toDateString() === new Date().toDateString()).length,
+  });
+});
+
 app.get("/buscar-videos", async (c) => {
   const q = c.req.query("q")?.trim();
   if (!q) return c.json({ erro: "informe o termo" }, 400);

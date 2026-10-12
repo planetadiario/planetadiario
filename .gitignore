@@ -8,3 +8,4 @@ __pycache__/
 *.pyc
 pipeline/tmp/
 supabase/.temp/
+pipeline/vozes/

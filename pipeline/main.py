@@ -149,6 +149,9 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             "resumo_do_assunto": tend.get("resumo"),
             "manchetes_relacionadas": [n.get("titulo") for n in (tend.get("noticias") or [])][:4],
             "pais": tend.get("pais"),
+            "duracao_video_seg": meta.get("duracao"),
+            # ~2,5 palavras por segundo, no máximo 40 s de fala
+            "limite_palavras_narracao": int(min(40, max(8, (meta.get("duracao") or 30))) * 2.5),
         }
         print("✍️  escrevendo textos")
         cfg_apr = db_get("config", "chave=eq.aprendizados", "valor")
@@ -161,14 +164,26 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
 
         cfg = db_get("config", "chave=eq.rodape", "valor")
         rodape = cfg[0]["valor"] if cfg else ""
+
+        # narração em português + legendas (conteúdo transformado: conta para a monetização)
+        cfg_narr = db_get("config", "chave=eq.narracao", "valor")
+        narr_cfg = (cfg_narr[0]["valor"] if cfg_narr else None) or {}
+        narracao_wav, trechos = None, None
+        if narr_cfg.get("ativa") and textos.get("narracao"):
+            from narracao import narrar
+            print("🎙️  narrando em português")
+            narracao_wav = pasta / "narracao.wav"
+            trechos = narrar(textos["narracao"], narracao_wav, narr_cfg.get("voz", "cadu"))
         corte = (reel.get("corte_inicio"), reel.get("corte_fim"))
 
         print("🎬 montando versão Facebook/site")
         saida = pasta / "reel.mp4"
-        res = montar(video, baixar_molde(reel["categoria"], pasta, "facebook"), textos["manchete"], rodape, saida, *corte, rede="facebook")
+        res = montar(video, baixar_molde(reel["categoria"], pasta, "facebook"), textos["manchete"], rodape, saida, *corte,
+                     rede="facebook", narracao=narracao_wav, trechos=trechos)
         print("🎬 montando versão Instagram")
         saida_ig = pasta / "reel-ig.mp4"
-        montar(video, baixar_molde(reel["categoria"], pasta, "instagram"), textos["manchete"], rodape, saida_ig, *corte, rede="instagram")
+        montar(video, baixar_molde(reel["categoria"], pasta, "instagram"), textos["manchete"], rodape, saida_ig, *corte,
+               rede="instagram", narracao=narracao_wav, trechos=trechos)
 
         print("☁️  enviando")
         url_video = enviar_arquivo(f"{reel_id}.mp4", saida, "video/mp4")
@@ -180,6 +195,7 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             "manchete": textos["manchete"],
             "legenda": textos["legenda"],
             "artigo": textos.get("artigo"),
+            "narracao": textos.get("narracao"),
             "categoria": reel["categoria"],
             "hashtags": textos["hashtags"],
             "video_path": f"{BUCKET}/{reel_id}.mp4",

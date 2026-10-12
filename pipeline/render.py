@@ -4,6 +4,7 @@ Camadas: vídeo (tela cheia se vertical; centralizado com fundo desfocado se hor
 → degradê escuro embaixo → molde da categoria → manchete → rodapé vermelho.
 """
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -17,9 +18,9 @@ W, H = 1080, 1920
 # Medidas no vídeo 1080x1920 para cada rede (os moldes de cada uma seguem as mesmas posições)
 LAYOUTS = {
     # layout original: logo no topo, faixa e manchete embaixo
-    "facebook": {"caixa": (255, 1390), "texto": (1500, 1800), "margem": 60, "degrade": 1180, "linhas": 4, "fonte": (72, 42)},
+    "facebook": {"caixa": (255, 1390), "texto": (1500, 1800), "margem": 60, "degrade": 1180, "linhas": 4, "fonte": (72, 42), "legenda_margem": 560},
     # área segura do Instagram: o feed recorta 4:5 (y 285–1635) e a interface do Reel cobre a base
-    "instagram": {"caixa": (255, 1150), "texto": (1236, 1545), "margem": 70, "degrade": 900, "linhas": 3, "fonte": (64, 38)},
+    "instagram": {"caixa": (255, 1150), "texto": (1236, 1545), "margem": 70, "degrade": 900, "linhas": 3, "fonte": (64, 38), "legenda_margem": 800},
 }
 COR_RODAPE = (255, 40, 40, 255)
 DURACAO_MAX = 90
@@ -106,13 +107,24 @@ def sondar(video: Path) -> dict:
 
 
 def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
-           inicio: float | None = None, fim: float | None = None, rede: str = "facebook") -> dict:
+           inicio: float | None = None, fim: float | None = None, rede: str = "facebook",
+           narracao: Path | None = None, trechos: list | None = None) -> dict:
+    """Monta o Reel. Com `narracao`, o vídeo dura o tempo da fala (+0,8 s), o áudio original
+    fica baixo por baixo e as legendas em português são queimadas no vídeo."""
     layout = LAYOUTS[rede]
     CAIXA_Y0, CAIXA_Y1 = layout["caixa"]
     info = sondar(video)
     inicio = inicio or 0.0
     fim = min(fim or info["duracao"], inicio + DURACAO_MAX)
     duracao = max(3.0, fim - inicio)
+    if narracao:
+        from narracao import duracao_wav, legendas_ass
+
+        duracao = min(DURACAO_MAX, duracao_wav(narracao) + 0.8)
+        ass = legendas_ass(trechos or [], saida.with_suffix(f".{rede}.ass"), layout["legenda_margem"])
+        # o filtro de legendas roda com a pasta de saída como diretório atual (caminhos simples)
+        # fonte estática ExtraBold só para a legenda (o libass não aplica peso de fonte variável)
+        shutil.copy(RAIZ / "fonts" / "Montserrat-Legenda.ttf", saida.parent / "Montserrat-Legenda.ttf")
 
     overlay = camada(molde, manchete, rodape, saida.with_suffix(".overlay.png"), layout)
     if info["vertical"]:
@@ -125,19 +137,33 @@ def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
             f"[0:v]scale={W}:{caixa_h}:force_original_aspect_ratio=decrease:force_divisible_by=2[fg];"
             f"[bg][fg]overlay=(W-w)/2:{CAIXA_Y0}+({caixa_h}-h)/2[v1];"
         )
-    filtro = base + "[v1][1:v]overlay=0:0,fps=30,format=yuv420p[v]"
+    if narracao:
+        # congela o último quadro se a fala for maior que o trecho do vídeo
+        base = base.replace("[0:v]", "[0:v]tpad=stop_mode=clone:stop_duration=60,", 1) if info["vertical"] else \
+            base.replace("[0:v]scale", "[0:v]tpad=stop_mode=clone:stop_duration=60,scale", 2)
+        filtro = base + f"[v1][1:v]overlay=0:0,subtitles={ass.name}:fontsdir=.,fps=30,format=yuv420p[v]"
+        if info["tem_audio"]:
+            filtro += ";[0:a]volume=0.15[a0];[2:a]volume=1.5[a1];[a0][a1]amix=inputs=2:duration=longest:normalize=0[a]"
+        else:
+            filtro += ";[2:a]volume=1.5[a]"
+    else:
+        filtro = base + "[v1][1:v]overlay=0:0,fps=30,format=yuv420p[v]"
 
-    cmd = [
-        "ffmpeg", "-y", "-ss", f"{inicio:.2f}", "-t", f"{duracao:.2f}", "-i", str(video),
-        "-i", str(overlay), "-filter_complex", filtro, "-map", "[v]",
+    cmd = ["ffmpeg", "-y", "-ss", f"{inicio:.2f}"] + ([] if narracao else ["-t", f"{duracao:.2f}"]) + [
+        "-i", str(video.resolve()), "-i", str(overlay.resolve()),
     ]
-    if info["tem_audio"]:
+    if narracao:
+        cmd += ["-i", str(narracao.resolve())]
+    cmd += ["-filter_complex", filtro, "-map", "[v]"]
+    if narracao:
+        cmd += ["-map", "[a]", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-t", f"{duracao:.2f}"]
+    elif info["tem_audio"]:
         cmd += ["-map", "0:a:0", "-c:a", "aac", "-b:a", "128k", "-ar", "44100"]
     cmd += [
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-profile:v", "high",
-        "-movflags", "+faststart", str(saida),
+        "-movflags", "+faststart", str(saida.resolve()),
     ]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, cwd=saida.parent)
 
     capa = saida.with_suffix(".jpg")
     subprocess.run(

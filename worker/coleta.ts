@@ -4,7 +4,7 @@ import { buscarVideos, dailymotion, googleTrends, youtubeEmAlta } from "./coleto
 import { bluesky, noticiasPais, telegram } from "./fontes-extras";
 import { analisarTendencias } from "./ia";
 import { dispararRender } from "./github";
-import { metricasReel } from "./facebook";
+import { metricasReel, seguidores } from "./facebook";
 
 export function supa(env: Bindings) {
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -21,6 +21,8 @@ export interface Config {
   aprendizados?: { texto?: string };
   telegram_canais?: string[];
   intervalo_min_minutos?: number;
+  horarios_pico?: [number, number][];
+  meta_posts_dia?: number;
 }
 
 export const CANAIS_TELEGRAM_PADRAO = [
@@ -206,6 +208,18 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .not("status", "in", "(rejeitado,erro)");
   if ((count ?? 0) >= cfg.max_posts_dia) return log.push("piloto: limite diário atingido");
 
+  // só publica nos horários de pico (Brasília)
+  const hora = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hourCycle: "h23" }));
+  const janelas = cfg.horarios_pico?.length ? cfg.horarios_pico : [[7, 9], [11, 14], [17, 23]];
+  if (!janelas.some(([a, b]) => hora >= a && hora < b)) return;
+
+  // ritmo: se estiver atrás da meta do dia, aceita nota um pouco menor (mínimo 60)
+  const minutosPico = janelas.reduce((s, [a, b]) => s + (b - a) * 60, 0);
+  const minutosPassados = janelas.reduce((s, [a, b]) => s + Math.max(0, Math.min(hora, b) - a) * 60, 0);
+  const esperado = Math.floor(((cfg.meta_posts_dia ?? 8) * minutosPassados) / Math.max(1, minutosPico));
+  const atrasado = (count ?? 0) < esperado;
+  const notaMinima = atrasado ? Math.max(60, cfg.score_minimo_auto - 10) : cfg.score_minimo_auto;
+
   // reels em produção seguram a fila (evita publicar vários de uma vez)
   const { count: emProducao } = await db
     .from("reels")
@@ -230,7 +244,7 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .select("*")
     .eq("usado", false)
     .eq("analisado", true)
-    .gte("score", cfg.score_minimo_auto)
+    .gte("score", notaMinima)
     .gte("detectado_em", desde)
     .order("score", { ascending: false })
     .limit(5);
@@ -279,6 +293,15 @@ export async function atualizarMetricas(env: Bindings) {
     .order("metricas_em", { ascending: true, nullsFirst: true })
     .limit(6); // ~8 chamadas por Reel; o plano grátis permite 50 por execução
   const log: string[] = [];
+  // seguidores do dia (meta de monetização)
+  try {
+    const s = await seguidores(env);
+    const dia = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    await db.from("seguidores_historico").upsert({ dia, fb: s.fb, ig: s.ig, atualizado_em: new Date().toISOString() });
+    log.push(`seguidores: FB ${s.fb} · IG ${s.ig}`);
+  } catch (e) {
+    log.push(`seguidores: ${e instanceof Error ? e.message : e}`);
+  }
   for (const r of data ?? []) {
     try {
       const metricas = await metricasReel(env, r.fb_video_id, r.ig_media_id);
