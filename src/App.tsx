@@ -39,7 +39,10 @@ function gravar(chave: string, valor: string) {
 
 export default function App() {
   const [sessao, setSessao] = useState<Session | null | undefined>(undefined);
-  const [aba, setAba] = useState<Aba>(() => (ABAS.some((a) => a.id === ler("aba")) ? (ler("aba") as Aba) : "visao"));
+  // volta da conexão de uma rede (OAuth) abre direto em Ajustes → Redes
+  const [aba, setAba] = useState<Aba>(() =>
+    new URLSearchParams(location.search).has("rede") ? "ajustes" : ABAS.some((a) => a.id === ler("aba")) ? (ler("aba") as Aba) : "visao",
+  );
   const [escuro, setEscuro] = useState(() => document.documentElement.classList.contains("dark"));
   const [recolhido, setRecolhido] = useState(() => ler("menu") === "recolhido");
 

@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import { api, type Categoria } from "../api";
 import Abas from "../Abas";
 import Icone from "../Icone";
+import Redes from "./Redes";
 
 interface Aprendizados {
   texto?: string;
@@ -36,13 +37,13 @@ interface Cfg {
 
 const CANAIS_TELEGRAM_PADRAO = ["Breaking911", "bnonews", "disclosetv", "insiderpaper", "wfwitness", "ClashReport", "WarMonitors", "metropoles", "cnnbrasil", "g1noticias"];
 
-type Aba = "automacao" | "inteligencia" | "categorias" | "reel" | "fontes" | "site";
+type Aba = "automacao" | "inteligencia" | "categorias" | "reel" | "fontes" | "redes" | "site";
 
 export default function Ajustes() {
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [salvo, setSalvo] = useState("");
-  const [aba, setAba] = useState<Aba>("automacao");
+  const [aba, setAba] = useState<Aba>(() => (new URLSearchParams(location.search).has("rede") ? "redes" : "automacao"));
 
   useEffect(() => {
     supabase.from("config").select("*").then(({ data }) => setCfg(Object.fromEntries((data ?? []).map((c) => [c.chave, c.valor])) as Cfg));
@@ -74,6 +75,7 @@ export default function Ajustes() {
           { id: "categorias", nome: "Categorias", icone: "categorias", contagem: categorias.filter((c) => c.ativa).length },
           { id: "reel", nome: "Reel", icone: "reels" },
           { id: "fontes", nome: "Fontes", icone: "globo" },
+          { id: "redes", nome: "Redes", icone: "compartilhar" },
           { id: "site", nome: "Site e assinatura", icone: "estrela" },
         ]}
         extra={salvo && <span className="flex items-center gap-1 text-sm text-emerald-500"><Icone nome="check" className="size-4" />{salvo}</span>}
@@ -206,6 +208,8 @@ export default function Ajustes() {
           </section>
         </div>
       )}
+
+      {aba === "redes" && <Redes />}
 
       {aba === "site" && (
         <div className="grid gap-5 lg:grid-cols-2">

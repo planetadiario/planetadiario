@@ -6,6 +6,7 @@ import { apagarInstagram, publicarReel, publicarReelInstagram, publicarStoryFace
 import { dispararRender, dispararTarefa } from "./github";
 import { paginaCategoria, paginaNoticia, site, sitemap } from "./site";
 import { gerarAprendizados } from "./aprendizados";
+import { REDES, concluirConexao, publicarPendente, situacaoRedes, urlConectar, type Rede } from "./redes";
 
 const CRON_METRICAS = "2,32 * * * *";
 const CRON_INSTAGRAM = "7-57/10 * * * *";
@@ -95,6 +96,29 @@ app.post("/interno/instagram-pendente", async (c) => {
   return c.json({ ok: true, resultado: await instagramPendente(c.env) });
 });
 
+// redes extras: publica 1 Reel pendente na rede (Telegram, Threads, YouTube, TikTok)
+app.post("/interno/redes/:rede", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  const rede = c.req.param("rede") as Rede;
+  if (!REDES.includes(rede)) return c.json({ erro: "rede desconhecida" }, 404);
+  return c.json(await publicarPendente(c.env, rede));
+});
+
+// volta da autorização (Google, TikTok, Threads): o "state" assinado garante que partiu do painel
+app.get("/oauth/:rede", async (c) => {
+  const rede = c.req.param("rede") as Rede;
+  const code = c.req.query("code");
+  const state = c.req.query("state") ?? "";
+  let msg = "conectado";
+  try {
+    if (!REDES.includes(rede) || !code) throw new Error(c.req.query("error_description") ?? c.req.query("error") ?? "autorização cancelada");
+    await concluirConexao(c.env, rede, code, state);
+  } catch (e) {
+    msg = e instanceof Error ? e.message : String(e);
+  }
+  return c.redirect(`/painel?rede=${encodeURIComponent(rede)}&resultado=${encodeURIComponent(msg)}`);
+});
+
 // Site público (leitores)
 app.route("/site", site);
 
@@ -113,6 +137,18 @@ app.use("*", async (c, next) => {
 });
 
 app.post("/coletar", async (c) => c.json({ log: await coletar(c.env) }));
+
+app.get("/redes", async (c) => c.json(await situacaoRedes(c.env)));
+app.post("/redes/:rede/conectar", async (c) => c.json({ url: await urlConectar(c.env, c.req.param("rede") as Rede) }));
+app.delete("/redes/:rede", async (c) => {
+  await supa(c.env).from("integracoes").delete().eq("rede", c.req.param("rede"));
+  return c.json({ ok: true });
+});
+app.post("/redes/:rede/publicar", async (c) => {
+  const rede = c.req.param("rede") as Rede;
+  if (!REDES.includes(rede)) return c.json({ erro: "rede desconhecida" }, 404);
+  return c.json(await publicarPendente(c.env, rede));
+});
 
 app.post("/aprendizados", async (c) => c.json(await gerarAprendizados(c.env)));
 
@@ -342,7 +378,7 @@ export default {
     // o cron só dispara; o GitHub Actions chama a rota interna, que pode levar minutos
     const agora = new Date(ctrl.scheduledTime);
     let rota = "coletar";
-    if (ctrl.cron === CRON_INSTAGRAM) rota = "instagram-pendente";
+    if (ctrl.cron === CRON_INSTAGRAM) rota = ["instagram-pendente", ...REDES.map((r) => `redes/${r}`)].join(" ");
     else if (ctrl.cron === CRON_METRICAS) {
       // uma vez por dia (6h05 em Brasília) a IA revisa o desempenho e atualiza os aprendizados
       rota = agora.getUTCHours() === 9 && agora.getUTCMinutes() < 30 ? "aprendizados" : "metricas";

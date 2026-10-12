@@ -18,6 +18,15 @@ export interface Bindings {
   LYTEX_CALLBACK_SECRET?: string;
   BLUESKY_USUARIO?: string;
   BLUESKY_SENHA_APP?: string;
+  // redes extras (opcionais: sem a credencial, a rede fica desligada)
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CANAL?: string;
+  THREADS_APP_ID?: string;
+  THREADS_APP_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  TIKTOK_CLIENT_KEY?: string;
+  TIKTOK_CLIENT_SECRET?: string;
 }
 
 export interface Tendencia {

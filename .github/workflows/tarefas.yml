@@ -11,7 +11,7 @@ on:
 
 concurrency:
   # as duas coletas (par/ímpar) nunca rodam juntas: duas ao mesmo tempo publicavam o mesmo assunto
-  group: tarefa-${{ startsWith(inputs.rota, 'coletar') && 'coletar' || inputs.rota }}
+  group: tarefa-${{ startsWith(inputs.rota, 'coletar') && 'coletar' || startsWith(inputs.rota, 'instagram') && 'redes' || inputs.rota }}
   cancel-in-progress: false
 
 jobs:
@@ -24,4 +24,9 @@ jobs:
           ROTA: ${{ inputs.rota }}
           INTERNAL_SECRET: ${{ secrets.INTERNAL_SECRET }}
         run: |
-          curl -sS -m 840 -X POST -H "x-internal-secret: $INTERNAL_SECRET" "https://planetadiario.online/api/interno/$ROTA" | head -c 4000
+          # uma ou mais rotas separadas por espaço (cada uma é uma execução própria do worker)
+          for r in $ROTA; do
+            echo "== $r"
+            curl -sS -m 840 -X POST -H "x-internal-secret: $INTERNAL_SECRET" "https://planetadiario.online/api/interno/$r" | head -c 4000 || true
+            echo
+          done
