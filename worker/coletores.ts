@@ -135,11 +135,11 @@ export async function youtubeEmAlta(env: Bindings, pais: string): Promise<Tenden
 }
 
 /** Busca vídeos sobre um assunto (para o botão "Buscar vídeos" do painel) */
-export async function buscarVideos(env: Bindings, q: string) {
+export async function buscarVideos(env: Bindings, q: string, usarYoutube = true) {
   const tarefas: Promise<Tendencia[]>[] = [];
   const desde = new Date(Date.now() - 4 * 86400_000);
 
-  if (env.YOUTUBE_API_KEY) {
+  if (env.YOUTUBE_API_KEY && usarYoutube) {
     const url =
       `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&order=viewCount&videoDuration=short` +
       `&publishedAfter=${desde.toISOString()}&maxResults=12&q=${encodeURIComponent(q)}&key=${env.YOUTUBE_API_KEY}`;

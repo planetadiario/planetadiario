@@ -159,6 +159,7 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             from entender import quadros, transcrever
             print("👂 transcrevendo o áudio original")
             fala = transcrever(video)
+            contexto["_fala"] = fala
             if fala["texto"]:
                 contexto["transcricao_original"] = fala["texto"]
                 contexto["idioma_original"] = fala["idioma"]
@@ -182,11 +183,25 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
         cfg_narr = db_get("config", "chave=eq.narracao", "valor")
         narr_cfg = (cfg_narr[0]["valor"] if cfg_narr else None) or {}
         narracao_wav, trechos = None, None
-        if narr_cfg.get("ativa") and textos.get("narracao"):
+        fala = contexto.pop("_fala", None) or {}
+        fala_pt = fala.get("idioma") == "pt" and fala.get("palavras", 0) >= 8
+        modo = reel.get("narracao_modo") or "auto"
+        if modo == "sim":
+            narrar_agora = True
+        elif modo == "nao":
+            narrar_agora = False
+        else:  # automático: ligado nos Ajustes + IA decide, e nunca por cima de fala em português
+            narrar_agora = bool(narr_cfg.get("ativa")) and bool(textos.get("usar_narracao", True)) and not fala_pt
+        if narrar_agora and textos.get("narracao"):
             from narracao import narrar
             print("🎙️  narrando em português")
             narracao_wav = pasta / "narracao.wav"
             trechos = narrar(textos["narracao"], narracao_wav, narr_cfg.get("voz", "cadu"))
+        elif fala_pt:
+            # fala em português: mantém o áudio original e legenda o que é dito
+            from entender import legendas_da_fala
+            print("💬 legendando a fala em português")
+            trechos = legendas_da_fala(fala["segmentos"])
         corte = (reel.get("corte_inicio"), reel.get("corte_fim"))
 
         print("🎬 montando versão Facebook/site")

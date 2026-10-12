@@ -14,6 +14,7 @@ export default function NovoReel({ criado }: { criado: () => void }) {
   const [url, setUrl] = useState("");
   const [categoria, setCategoria] = useState(""); // "" = a IA decide
   const [auto, setAuto] = useState(false);
+  const [narracao, setNarracao] = useState<"auto" | "sim" | "nao">("auto");
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
@@ -29,7 +30,7 @@ export default function NovoReel({ criado }: { criado: () => void }) {
     try {
       await api("/reels", {
         method: "POST",
-        body: JSON.stringify({ origem_url: url.trim(), categoria: categoria || undefined, auto_publicar: auto }),
+        body: JSON.stringify({ origem_url: url.trim(), categoria: categoria || undefined, auto_publicar: auto, narracao_modo: narracao }),
       });
       criado();
     } catch (e) {
@@ -72,6 +73,22 @@ export default function NovoReel({ criado }: { criado: () => void }) {
           <p className="mt-2 text-xs text-suave">
             {categoria ? "Categoria fixa: a IA não altera." : "A IA escolhe a categoria pelo assunto do vídeo (ex.: espaço vira CIÊNCIA)."}
           </p>
+        </div>
+        <div>
+          <span className="mb-1.5 block text-sm font-medium">Narração em português</span>
+          <div className="flex flex-wrap gap-2">
+            {([["auto", "Automática (IA decide)"], ["sim", "Com narração"], ["nao", "Sem narração (som original)"]] as const).map(([v, r]) => (
+              <button
+                type="button"
+                key={v}
+                onClick={() => setNarracao(v)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${narracao === v ? "bg-marca text-white" : "border border-borda text-suave hover:text-texto"}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-suave">Fala em português nunca recebe narração por cima: ganha legenda do que é dito.</p>
         </div>
         <label className="flex items-center gap-3 rounded-lg border border-borda p-3 text-sm">
           <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} className="size-4 accent-marca" />

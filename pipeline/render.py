@@ -117,11 +117,17 @@ def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
     inicio = inicio or 0.0
     fim = min(fim or info["duracao"], inicio + DURACAO_MAX)
     duracao = max(3.0, fim - inicio)
+    ass = None
     if narracao:
-        from narracao import duracao_wav, legendas_ass
+        from narracao import duracao_wav
 
         duracao = min(DURACAO_MAX, duracao_wav(narracao) + 0.8)
-        ass = legendas_ass(trechos or [], saida.with_suffix(f".{rede}.ass"), layout["legenda_margem"])
+    if trechos:
+        from narracao import legendas_ass
+
+        # legenda só do trecho usado do vídeo (tempos relativos ao corte)
+        locais = [(a - inicio, b - inicio, t) for a, b, t in trechos if b > inicio and a - inicio < duracao] if not narracao else trechos
+        ass = legendas_ass(locais, saida.with_suffix(f".{rede}.ass"), layout["legenda_margem"])
         # o filtro de legendas roda com a pasta de saída como diretório atual (caminhos simples)
         # fonte estática ExtraBold só para a legenda (o libass não aplica peso de fonte variável)
         (saida.parent / "fonte_legenda").mkdir(exist_ok=True)
@@ -148,7 +154,8 @@ def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
         else:
             filtro += ";[2:a]volume=1.5[a]"
     else:
-        filtro = base + "[v1][1:v]overlay=0:0,fps=30,format=yuv420p[v]"
+        legenda = f",subtitles={ass.name}:fontsdir=fonte_legenda" if ass else ""
+        filtro = base + f"[v1][1:v]overlay=0:0{legenda},fps=30,format=yuv420p[v]"
 
     cmd = ["ffmpeg", "-y", "-ss", f"{inicio:.2f}"] + ([] if narracao else ["-t", f"{duracao:.2f}"]) + [
         "-i", str(video.resolve()), "-i", str(overlay.resolve()),

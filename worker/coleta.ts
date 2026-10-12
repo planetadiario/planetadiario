@@ -118,6 +118,10 @@ export async function coletar(env: Bindings, forcarGrupo?: "par" | "impar") {
 
   await analisarPendentes(env, db, log, cfg.aprendizados?.texto ?? "");
 
+  // assuntos quentes sem vídeo: procura um vídeo e já deixa pronto no Radar
+  // (busca no YouTube custa 100 de cota; só em 1 a cada 4 rodadas para caber nos 10 mil/dia)
+  await buscarVideosQuentes(env, db, log, rodada % 4 === 0);
+
   if (cfg.publicacao_automatica) await pilotoAutomatico(env, db, cfg, log);
 
   log.unshift(`coleta: ${novos.length} itens — ${grupo}`);
@@ -320,4 +324,31 @@ export async function atualizarMetricas(env: Bindings) {
   }
   console.log(log.join(String.fromCharCode(10)));
   return log;
+}
+
+async function buscarVideosQuentes(env: Bindings, db: SupabaseClient, log: string[], usarYoutube: boolean) {
+  const { data } = await db
+    .from("tendencias")
+    .select("id, titulo, titulo_pt, score, extra")
+    .eq("analisado", true)
+    .is("video_url", null)
+    .gte("score", 70)
+    .gte("detectado_em", new Date(Date.now() - 6 * 3600_000).toISOString())
+    .order("score", { ascending: false })
+    .limit(10);
+  const pendentes = (data ?? []).filter((t) => !t.extra?.buscado).slice(0, usarYoutube ? 1 : 2);
+  for (const t of pendentes) {
+    const busca = String(t.extra?.busca ?? t.titulo);
+    const videos = (await buscarVideos(env, busca, usarYoutube)).filter((v) => Number(v.extra?.duracao ?? 0) <= 240);
+    // YouTube primeiro (busca por relevância e vídeos curtos); depois Dailymotion
+    const melhor = videos.find((v) => v.fonte === "youtube") ?? videos[0];
+    await db
+      .from("tendencias")
+      .update({
+        ...(melhor ? { video_url: melhor.video_url, imagem: melhor.imagem } : {}),
+        extra: { ...(t.extra ?? {}), buscado: true, ...(melhor ? { autor: melhor.extra?.autor, video_titulo: melhor.titulo } : {}) },
+      })
+      .eq("id", t.id);
+    log.push(`vídeo para "${(t.titulo_pt ?? t.titulo).slice(0, 50)}": ${melhor ? melhor.video_url : "nenhum"}`);
+  }
 }

@@ -35,7 +35,11 @@ Você vai gerar:
    dinheiro/mercado → "economia"; fato grave de última hora → "urgente"; fato do Brasil sem tema específico → "noticias";
    fato internacional sem tema específico → "mundo"; vídeo inusitado que viralizou → "viral"; história tocante → "emocionante";
    engraçado → "humor"; fato curioso → "curiosidades".
-6. narracao: o texto que um narrador de telejornal vai LER em voz alta sobre o vídeo, em português do Brasil:
+6. usar_narracao (true/false): decida se este vídeo ganha narração por cima.
+   - false quando o próprio áudio é o conteúdo: alguém falando em PORTUGUÊS, som de animal, música, momento
+     emocionante ou engraçado em que o som original importa, vídeo autoexplicativo sem fala;
+   - true quando há fala ou texto em outra língua, ou quando o vídeo precisa de contexto para ser entendido.
+7. narracao: o texto que um narrador de telejornal vai LER em voz alta sobre o vídeo, em português do Brasil:
    - começa pelo fato mais impactante (o gancho tem que prender nos 2 primeiros segundos);
    - 2 a 4 frases curtas, linguagem falada e natural, sem emoji, sem hashtag, sem siglas difíceis;
    - acompanha o vídeo NA ORDEM: narra o que aparece em cada parte (use os quadros e a "transcricao_original"),
@@ -58,8 +62,9 @@ ESQUEMA = {
         "hashtags": {"type": "array", "items": {"type": "string"}},
         "categoria": {"type": "string", "enum": CATEGORIAS},
         "narracao": {"type": "string"},
+        "usar_narracao": {"type": "boolean"},
     },
-    "required": ["manchete", "legenda", "artigo", "hashtags", "categoria", "narracao"],
+    "required": ["manchete", "legenda", "artigo", "hashtags", "categoria", "narracao", "usar_narracao"],
     "additionalProperties": False,
 }
 

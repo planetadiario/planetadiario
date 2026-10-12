@@ -130,6 +130,7 @@ app.post("/reels", async (c) => {
     origem_titulo?: string;
     origem_autor?: string;
     auto_publicar?: boolean;
+    narracao_modo?: "auto" | "sim" | "nao";
   }>();
   if (!/^https?:\/\//.test(body.origem_url ?? "")) return c.json({ erro: "link inválido" }, 400);
   const db = supa(c.env);
@@ -140,6 +141,7 @@ app.post("/reels", async (c) => {
       categoria: body.categoria ?? "noticias",
       // sem categoria escolhida a dedo, a IA decide pelo assunto do vídeo
       categoria_auto: !body.categoria || !!body.tendencia_id,
+      narracao_modo: ["auto", "sim", "nao"].includes(body.narracao_modo ?? "") ? body.narracao_modo : "auto",
       tendencia_id: body.tendencia_id ?? null,
       origem_titulo: body.origem_titulo ?? null,
       origem_autor: body.origem_autor ?? null,

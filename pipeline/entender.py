@@ -20,12 +20,29 @@ def transcrever(video: Path, max_seg: float = 120) -> dict:
 
     modelo = WhisperModel("base", device="cpu", compute_type="int8")
     segmentos, info = modelo.transcribe(audio, vad_filter=True, beam_size=1)
-    trechos = []
+    trechos, segs = [], []
     for s in segmentos:
         if s.start > max_seg:
             break
         trechos.append(f"[{int(s.start)}s] {s.text.strip()}")
-    return {"idioma": info.language, "texto": "\n".join(trechos)[:3500]}
+        segs.append((s.start, s.end, s.text.strip()))
+    palavras = sum(len(t.split()) for _, _, t in segs)
+    return {"idioma": info.language, "texto": "\n".join(trechos)[:3500], "segmentos": segs, "palavras": palavras}
+
+
+def legendas_da_fala(segs: list[tuple[float, float, str]]) -> list[tuple[float, float, str]]:
+    """Quebra a fala transcrita em blocos curtos (até 4 palavras) com tempos proporcionais."""
+    blocos = []
+    for ini, fim, texto in segs:
+        palavras = texto.split()
+        partes = [" ".join(palavras[i:i + 4]) for i in range(0, len(palavras), 4)] or [texto]
+        total = sum(len(p) for p in partes) or 1
+        t = ini
+        for p in partes:
+            d = (fim - ini) * len(p) / total
+            blocos.append((t, t + d, p))
+            t += d
+    return blocos
 
 
 def quadros(video: Path, pasta: Path, duracao: float, n: int = 6) -> list[str]:
