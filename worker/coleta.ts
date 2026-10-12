@@ -411,11 +411,12 @@ async function buscarVideosQuentes(env: Bindings, db: SupabaseClient, log: strin
     .select("id, titulo, titulo_pt, score, extra")
     .eq("analisado", true)
     .is("video_url", null)
+    .is("extra->>buscado", null) // só as que ainda não tiveram vídeo buscado (antes o filtro vinha depois do limite)
     .gte("score", 60)
     .gte("detectado_em", new Date(Date.now() - 6 * 3600_000).toISOString())
     .order("score", { ascending: false })
-    .limit(10);
-  const pendentes = (data ?? []).filter((t) => !t.extra?.buscado).slice(0, usarYoutube ? 2 : 3);
+    .limit(usarYoutube ? 2 : 3);
+  const pendentes = data ?? [];
   for (const t of pendentes) {
     const busca = String(t.extra?.busca ?? t.titulo);
     const videos = (await buscarVideos(env, busca, usarYoutube)).filter((v) => Number(v.extra?.duracao ?? 0) <= 240);

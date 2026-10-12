@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { api, numeroCurto } from "../api";
 import Icone from "../Icone";
-import IconeRede, { REDES_INFO, type RedeSocial } from "../IconeRede";
+import IconeRede, { REDES_INFO, type RedeSocial as RedeTodas } from "../IconeRede";
+
+type RedeSocial = Exclude<RedeTodas, "whatsapp" | "x">;
 
 interface Seguidores {
   atual: number | null;

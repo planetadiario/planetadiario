@@ -6,6 +6,7 @@ import { Avatar, LogoGoogle, SeloAssinante } from "./Site";
 import { ChamadaAssinatura, Selos } from "./Inicio";
 import { SeloFundador } from "./Fundadores";
 import Anuncio from "./Anuncio";
+import { Compartilhar, SigaRedes } from "./Redes";
 
 export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: Leitor | null | undefined }) {
   const [n, setN] = useState<Noticia | null | undefined>(undefined);
@@ -78,25 +79,9 @@ export default function PaginaNoticia({ slug, leitor }: { slug: string; leitor: 
         )}
 
         <Comentarios noticiaId={n.id} leitor={leitor} />
+        <SigaRedes titulo="Acompanhe o Planeta Diário nas redes" />
       </div>
     </article>
-  );
-}
-
-function Compartilhar({ url, titulo }: { url: string; titulo: string }) {
-  const [copiado, setCopiado] = useState(false);
-  const t = encodeURIComponent(titulo), u = encodeURIComponent(url);
-  return (
-    <div className="mt-8 flex flex-wrap gap-2 text-sm">
-      <a href={`https://wa.me/?text=${t}%20${u}`} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366] px-4 py-2 font-semibold text-white">WhatsApp</a>
-      <a href={`https://www.facebook.com/sharer/sharer.php?u=${u}`} target="_blank" rel="noreferrer" className="rounded-full bg-fb px-4 py-2 font-semibold text-white">Facebook</a>
-      <button
-        onClick={() => navigator.clipboard.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); })}
-        className="rounded-full border border-borda px-4 py-2 font-semibold hover:bg-painel-2"
-      >
-        {copiado ? "Link copiado" : "Copiar link"}
-      </button>
-    </div>
   );
 }
 
