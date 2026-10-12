@@ -499,31 +499,6 @@ export async function metricasRedes(env: Bindings) {
     } catch (e) {
       log.push(`youtube canal: ${e instanceof Error ? e.message : e}`);
     }
-    const { data: shorts } = await db
-      .from("reels")
-      .select("id, yt_id, metricas")
-      .not("yt_id", "is", null)
-      .gte("publicado_em", new Date(Date.now() - 90 * 86400_000).toISOString())
-      .order("publicado_em", { ascending: false })
-      .limit(30);
-    if (shorts?.length) {
-      const v = (await (
-        await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${shorts.map((s) => s.yt_id).join(",")}&key=${env.YOUTUBE_API_KEY}`)
-      ).json()) as { items?: { id: string; statistics: { viewCount?: string; likeCount?: string; commentCount?: string } }[] };
-      const porId = new Map((v.items ?? []).map((i) => [i.id, i.statistics]));
-      for (const s of shorts) {
-        const st = porId.get(s.yt_id!);
-        if (!st) continue;
-        const metricas = {
-          ...(s.metricas ?? {}),
-          yt_views: Number(st.viewCount ?? 0),
-          yt_curtidas: Number(st.likeCount ?? 0),
-          yt_comentarios: Number(st.commentCount ?? 0),
-        };
-        await db.from("reels").update({ metricas }).eq("id", s.id);
-      }
-      log.push(`youtube: ${porId.size} Shorts atualizados`);
-    }
   }
 
   // Telegram: inscritos do canal
@@ -544,10 +519,91 @@ export async function metricasRedes(env: Bindings) {
     else if (r.error) log.push(`threads: ${r.error.message.slice(0, 80)}`);
   }
 
+  // métricas de cada post nas redes extras; junta tudo e grava uma vez por Reel
+  const { data: posts } = await db
+    .from("reels")
+    .select("id, yt_id, tg_msg_id, threads_id, metricas")
+    .or("yt_id.not.is.null,tg_msg_id.not.is.null,threads_id.not.is.null")
+    .gte("publicado_em", new Date(Date.now() - 30 * 86400_000).toISOString())
+    .order("publicado_em", { ascending: false })
+    .limit(40);
+  const novas = new Map<string, Record<string, number>>();
+  const pôr = (id: string, m: Record<string, number>) => novas.set(id, { ...(novas.get(id) ?? {}), ...m });
+
+  // YouTube: views, curtidas e comentários de até 50 Shorts numa chamada
+  const shorts = (posts ?? []).filter((r) => r.yt_id);
+  if (shorts.length && env.YOUTUBE_API_KEY) {
+    try {
+      const v = (await (
+        await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${shorts.map((s) => s.yt_id).join(",")}&key=${env.YOUTUBE_API_KEY}`)
+      ).json()) as { items?: { id: string; statistics: { viewCount?: string; likeCount?: string; commentCount?: string } }[] };
+      const porId = new Map((v.items ?? []).map((i) => [i.id, i.statistics]));
+      for (const r of shorts) {
+        const st = porId.get(r.yt_id!);
+        if (st) pôr(r.id, { yt_views: Number(st.viewCount ?? 0), yt_curtidas: Number(st.likeCount ?? 0), yt_comentarios: Number(st.commentCount ?? 0) });
+      }
+      log.push(`youtube: ${porId.size} Shorts`);
+    } catch (e) {
+      log.push(`youtube vídeos: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  // Telegram: a página pública do canal mostra as views de cada post
+  const noTelegram = (posts ?? []).filter((r) => r.tg_msg_id);
+  if (noTelegram.length && env.TELEGRAM_CANAL) {
+    try {
+      const canal = String(env.TELEGRAM_CANAL).replace(/^@/, "");
+      const html = await (await fetch(`https://t.me/s/${canal}`, { headers: { "User-Agent": "Mozilla/5.0" } })).text();
+      const views = new Map<string, number>();
+      for (const bloco of html.split(`data-post="${canal}/`).slice(1)) {
+        const id = bloco.match(/^(\d+)"/)?.[1];
+        const txt = bloco.match(/tgme_widget_message_views">([^<]+)</)?.[1];
+        if (id && txt) views.set(id, numeroTelegram(txt));
+      }
+      let n = 0;
+      for (const r of noTelegram) {
+        const v = views.get(String(r.tg_msg_id));
+        if (v != null) { pôr(r.id, { tg_views: v }); n++; }
+      }
+      log.push(`telegram: ${n} posts`);
+    } catch (e) {
+      log.push(`telegram views: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  // Threads: insights de cada post (precisa reconectar com a permissão de insights)
+  if (th?.token) {
+    let n = 0;
+    for (const r of (posts ?? []).filter((x) => x.threads_id).slice(0, 10)) {
+      const j = (await (
+        await fetch(`https://graph.threads.net/v1.0/${r.threads_id}/insights?metric=views,likes,replies,reposts,shares&access_token=${th.token}`)
+      ).json()) as { data?: { name: string; values?: { value: number }[]; total_value?: { value: number } }[]; error?: { message: string } };
+      if (j.error) { log.push(`threads posts: ${j.error.message.slice(0, 80)}`); break; }
+      const m: Record<string, number> = {};
+      for (const d of j.data ?? []) m[`th_${d.name === "views" ? "views" : d.name}`] = Number(d.values?.[0]?.value ?? d.total_value?.value ?? 0);
+      pôr(r.id, m);
+      n++;
+    }
+    if (n) log.push(`threads: ${n} posts`);
+  }
+
+  for (const [id, m] of novas) {
+    const atual = (posts ?? []).find((r) => r.id === id)?.metricas ?? {};
+    await db.from("reels").update({ metricas: { ...atual, ...m } }).eq("id", id);
+  }
+
   if (Object.keys(hoje).length) {
     const dia = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
     await db.from("seguidores_historico").upsert({ dia, ...hoje, atualizado_em: new Date().toISOString() });
   }
   log.push(`seguidores: ${JSON.stringify(hoje)}`);
   return log;
+}
+
+/** "1.2K" → 1200 (formato das views na página do canal) */
+function numeroTelegram(t: string) {
+  const m = t.trim().match(/^([\d.,]+)\s*([KM]?)/i);
+  if (!m) return 0;
+  const n = Number(m[1].replace(",", "."));
+  return Math.round(n * (m[2].toUpperCase() === "M" ? 1e6 : m[2].toUpperCase() === "K" ? 1e3 : 1));
 }

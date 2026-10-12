@@ -13,6 +13,10 @@ interface Metricas {
   fb_views?: number;
   ig_views?: number;
   yt_views?: number;
+  th_views?: number;
+  th_likes?: number;
+  th_replies?: number;
+  tg_views?: number;
   yt_curtidas?: number;
   yt_comentarios?: number;
   ig_alcance?: number;
@@ -38,8 +42,17 @@ type Periodo = keyof typeof PERIODOS;
 const DIA = 86400_000;
 
 const eng = (m: Metricas | null) =>
-  m ? m.fb_curtidas + m.fb_comentarios + m.ig_curtidas + m.ig_comentarios + (m.yt_curtidas ?? 0) + (m.yt_comentarios ?? 0) : 0;
-const views = (m: Metricas | null) => (m ? (m.fb_views ?? 0) + (m.ig_views ?? 0) + (m.yt_views ?? 0) : 0);
+  m ? m.fb_curtidas + m.fb_comentarios + m.ig_curtidas + m.ig_comentarios + (m.yt_curtidas ?? 0) + (m.yt_comentarios ?? 0) + (m.th_likes ?? 0) + (m.th_replies ?? 0) : 0;
+const views = (m: Metricas | null) => (m ? (m.fb_views ?? 0) + (m.ig_views ?? 0) + (m.yt_views ?? 0) + (m.th_views ?? 0) + (m.tg_views ?? 0) : 0);
+
+// uma coluna de views por rede (· = publicado, número ainda não lido)
+const COLUNAS = [
+  { rede: "facebook", nome: "Facebook", url: "fb_post_url", views: "fb_views" },
+  { rede: "instagram", nome: "Instagram", url: "ig_post_url", views: "ig_views" },
+  { rede: "youtube", nome: "YouTube", url: "yt_url", views: "yt_views" },
+  { rede: "threads", nome: "Threads", url: "threads_url", views: "th_views" },
+  { rede: "telegram", nome: "Telegram", url: "tg_url", views: "tg_views" },
+] as const;
 
 export default function Visao() {
   const [periodo, setPeriodo] = useState<Periodo>("30 dias");
@@ -173,15 +186,18 @@ export default function Visao() {
           {d.top.length === 0 ? (
             <Vazio />
           ) : (
-            <table className="w-full text-sm">
+            <div className="-mx-5 overflow-x-auto px-5">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-suave">
                   <th className="pb-2 font-medium">Reel</th>
-                  <th className="pb-2 text-right font-medium" title="Views no Facebook"><IconeRede rede="facebook" className="ml-auto size-4" /></th>
-                  <th className="pb-2 text-right font-medium" title="Views no Instagram"><IconeRede rede="instagram" className="ml-auto size-4" /></th>
-                  <th className="pb-2 text-right font-medium" title="Views no YouTube"><IconeRede rede="youtube" className="ml-auto size-4" /></th>
-                  <th className="hidden pb-2 text-right font-medium md:table-cell">Retenção</th>
-                  <th className="pb-2 text-right font-medium">Engaj.</th>
+                  {COLUNAS.map((c) => (
+                    <th key={c.rede} className="w-16 pb-2 pl-2 font-medium" title={`Views no ${c.nome}`}>
+                      <span className="flex justify-end"><IconeRede rede={c.rede} className="size-4" /></span>
+                    </th>
+                  ))}
+                  <th className="hidden w-24 pb-2 pl-2 text-right font-medium md:table-cell">Retenção</th>
+                  <th className="w-16 pb-2 pl-2 text-right font-medium">Engaj.</th>
                 </tr>
               </thead>
               <tbody>
@@ -194,28 +210,22 @@ export default function Visao() {
                         ) : (
                           <span className="h-12 w-7 shrink-0 rounded bg-painel-2" />
                         )}
-                        <span className="flex min-w-0 flex-col gap-1">
-                          <span className="line-clamp-2">{r.manchete ?? "—"}</span>
-                          {/* em quais redes este Reel saiu */}
-                          <span className="flex gap-1.5 opacity-80">
-                            {r.fb_post_url && <IconeRede rede="facebook" className="size-3.5" />}
-                            {r.ig_post_url && <IconeRede rede="instagram" className="size-3.5" />}
-                            {r.yt_url && <IconeRede rede="youtube" className="size-3.5" />}
-                            {r.threads_url && <IconeRede rede="threads" className="size-3.5" />}
-                            {r.tg_url && <IconeRede rede="telegram" className="size-3.5" />}
-                          </span>
-                        </span>
+                        <span className="line-clamp-2 min-w-0">{r.manchete ?? "—"}</span>
                       </div>
                     </td>
-                    <td className="text-right tabular-nums">
-                      {r.fb_post_url ? <a href={r.fb_post_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto(r.metricas?.fb_views ?? 0) || "0"}</a> : "—"}
-                    </td>
-                    <td className="text-right tabular-nums">
-                      {r.ig_post_url ? <a href={r.ig_post_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto(r.metricas?.ig_views ?? 0) || "0"}</a> : "—"}
-                    </td>
-                    <td className="text-right tabular-nums">
-                      {r.yt_url ? <a href={r.yt_url} target="_blank" rel="noreferrer" className="hover:underline">{numeroCurto(r.metricas?.yt_views ?? 0) || "0"}</a> : "—"}
-                    </td>
+                    {COLUNAS.map((c) => {
+                      const url = r[c.url];
+                      const v = r.metricas?.[c.views];
+                      return (
+                        <td key={c.rede} className="pl-2 text-right tabular-nums">
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="hover:underline">{v == null ? "·" : numeroCurto(v) || "0"}</a>
+                          ) : (
+                            <span className="text-suave opacity-50">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
                     <td className="hidden text-right text-xs tabular-nums text-suave md:table-cell" title="Tempo médio assistido (Facebook / Instagram)">
                       {r.metricas?.fb_tempo_medio_ms != null ? `${Math.round(r.metricas.fb_tempo_medio_ms / 1000)}s` : "—"} / {r.metricas?.ig_tempo_medio_ms != null ? `${Math.round(r.metricas.ig_tempo_medio_ms / 1000)}s` : "—"}
                     </td>
@@ -224,6 +234,7 @@ export default function Visao() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </section>
