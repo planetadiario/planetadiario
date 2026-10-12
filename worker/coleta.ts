@@ -116,27 +116,58 @@ export async function coletar(env: Bindings, forcarGrupo?: "par" | "impar") {
   return log;
 }
 
+/**
+ * Pré-nota por sinais objetivos (sem IA): decide o que a IA analisa primeiro.
+ * Assim os itens mais promissores sempre recebem nota, mesmo com o limite do plano grátis.
+ */
+export function preNota(t: Tendencia): number {
+  const idadeMin = (Date.now() - Date.parse(String(t.extra?.publicado ?? t.detectado_em ?? Date.now()))) / 60_000;
+  const frescor = Number.isFinite(idadeMin) ? Math.max(0, 1 - idadeMin / 360) : 0.5; // perde valor em 6 h
+  const v = Number(t.trafego ?? 0);
+  let base: number;
+  switch (t.fonte) {
+    case "telegram": base = 70; break; // canais de última hora
+    case "bluesky": base = 40 + Math.min(40, v / 50); break; // curtidas
+    case "google_trends": base = 20 + Math.min(60, Math.log10(Math.max(1, v)) * 12); break; // volume de buscas
+    case "dailymotion": base = 15 + Math.min(55, v / 20); break; // views na última hora
+    case "youtube": base = 20 + Math.min(50, Math.log10(Math.max(1, v)) * 8); break; // views
+    default: base = 35;
+  }
+  const video = t.video_url ? 10 : 0;
+  const curto = Number(t.extra?.duracao ?? 60) <= 180 ? 5 : -15;
+  return base * (0.4 + 0.6 * frescor) + video + curto;
+}
+
 async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[], aprendizados: string) {
-  const { data: pendentes, error } = await db
+  const { data: candidatos, error } = await db
     .from("tendencias")
     .select("*")
     .eq("analisado", false)
-    .gte("detectado_em", new Date(Date.now() - 6 * 3600_000).toISOString())
+    .gte("detectado_em", new Date(Date.now() - 4 * 3600_000).toISOString())
     .order("detectado_em", { ascending: false })
-    .limit(60);
+    .limit(400);
   if (error) return log.push(`pendentes: ${error.message}`);
-  if (!pendentes?.length) return;
+  if (!candidatos?.length) return;
+
+  // os 45 mais promissores pela pré-nota vão para a IA nesta rodada
+  const pendentes = [...candidatos].sort((x, y) => preNota(y) - preNota(x)).slice(0, 45);
 
   try {
-    // dois lotes em paralelo para acompanhar o volume da coleta
-    // lotes pequenos, um de cada vez: cabem no tempo de resposta e no limite de pedidos do plano grátis
+    // lotes de 15, um de cada vez; se a NVIDIA limitar, espera e tenta de novo
     const analises: Awaited<ReturnType<typeof analisarTendencias>> = [];
     for (let i = 0; i < pendentes.length; i += 15) {
-      try {
-        analises.push(...(await analisarTendencias(env, pendentes.slice(i, i + 15), aprendizados)));
-      } catch (e) {
-        log.push(`analise lote ${i / 15 + 1}: ${e instanceof Error ? e.message.slice(0, 120) : e}`);
-        break;
+      for (let tentativa = 0; tentativa < 3; tentativa++) {
+        try {
+          analises.push(...(await analisarTendencias(env, pendentes.slice(i, i + 15), aprendizados)));
+          break;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (tentativa === 2 || !/429|524|503|502/.test(msg)) {
+            log.push(`analise lote ${i / 15 + 1}: ${msg.slice(0, 120)}`);
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 4000 * (tentativa + 1)));
+        }
       }
     }
     const porId = new Map(analises.map((a) => [a.id, a]));

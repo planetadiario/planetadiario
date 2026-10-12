@@ -36,6 +36,8 @@ export interface Reel {
   duracao: number | null;
   fb_post_url: string | null;
   ig_post_url: string | null;
+  slug: string | null;
+  liberado_em: string | null;
   publicado_em: string | null;
   erro: string | null;
   criado_em: string;

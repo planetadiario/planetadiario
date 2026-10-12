@@ -170,6 +170,20 @@ function CartaoReel({ reel }: { reel: Reel }) {
               Ver no Facebook
             </a>
           )}
+          {reel.status === "publicado" && reel.slug && (
+            <a
+              href={`/n/${reel.slug}`}
+              target="_blank"
+              rel="noreferrer"
+              title={reel.liberado_em && Date.parse(reel.liberado_em) > Date.now() ? `Assinantes já veem; público a partir de ${new Date(reel.liberado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Público no site"}
+              className="rounded-lg bg-texto px-3 py-1.5 font-semibold text-fundo"
+            >
+              Ver no site
+              {reel.liberado_em && Date.parse(reel.liberado_em) > Date.now() && (
+                <span className="ml-1 text-xs font-normal opacity-70">(público às {new Date(reel.liberado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })})</span>
+              )}
+            </a>
+          )}
           {reel.ig_post_url && (
             <a href={reel.ig_post_url} target="_blank" rel="noreferrer" className="rounded-lg bg-pink-600 px-3 py-1.5 font-semibold">
               Ver no Instagram
