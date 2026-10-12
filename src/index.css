@@ -55,3 +55,8 @@ body { -webkit-tap-highlight-color: transparent; font-feature-settings: "tnum"; 
   header, nav, aside, footer, .print\:hidden { display: none !important; }
   body { background: #fff !important; }
 }
+
+/* mãozinha ao passar o mouse em tudo que é clicável (o Tailwind 4 não aplica por padrão) */
+button:not(:disabled), [role="button"], [role="tab"], [role="switch"], summary, select,
+label:has(> input[type="checkbox"]), input[type="checkbox"], input[type="range"] { cursor: pointer; }
+button:disabled { cursor: not-allowed; }

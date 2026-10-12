@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import Icone from "../Icone";
 import { aoClicar, entrarComGoogle, navegar, useCaminho, useLeitor, type Leitor } from "./base";
@@ -10,6 +10,8 @@ import Conta from "./Conta";
 import Busca from "./Busca";
 import Fundadores from "./Fundadores";
 import { ColunaDireita, ColunaEsquerda } from "./Colunas";
+import { SeloFundador } from "./Fundadores";
+import { useInstalar } from "../pwa";
 
 function lerPreferencia(chave: string) {
   try {
@@ -108,7 +110,7 @@ export default function Site() {
             {leitor?.admin && (
               <a href="/painel" className="hidden rounded-full bg-texto px-3 py-1.5 text-sm font-semibold text-fundo sm:block">Painel</a>
             )}
-            <BotaoConta leitor={leitor} />
+            <BotaoConta leitor={leitor} alternarTema={alternarTema} />
           </div>
         </div>
         {buscaMovel && (
@@ -186,7 +188,23 @@ function AbaApp({ ativo, icone, rotulo, onClick }: { ativo: boolean; icone: stri
   );
 }
 
-function BotaoConta({ leitor }: { leitor: Leitor | null | undefined }) {
+function BotaoConta({ leitor, alternarTema }: { leitor: Leitor | null | undefined; alternarTema: () => void }) {
+  const [aberto, setAberto] = useState(false);
+  const caixa = useRef<HTMLDivElement>(null);
+  const instalar = useInstalar();
+
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e: MouseEvent) => !caixa.current?.contains(e.target as Node) && setAberto(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setAberto(false);
+    document.addEventListener("mousedown", fora);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", fora);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [aberto]);
+
   if (leitor === undefined) return <span className="size-9" />;
   if (!leitor)
     return (
@@ -194,12 +212,90 @@ function BotaoConta({ leitor }: { leitor: Leitor | null | undefined }) {
         <LogoGoogle /> Entrar
       </button>
     );
+
+  const ir = (caminho: string) => {
+    setAberto(false);
+    navegar(caminho);
+  };
+  const Item = ({ icone, rotulo, onClick, seta }: { icone: string; rotulo: string; onClick: () => void; seta?: boolean }) => (
+    <button onClick={onClick} className="flex w-full items-center gap-4 px-4 py-2.5 text-left text-sm hover:bg-painel-2">
+      <Icone nome={icone} className="size-5 shrink-0" />
+      <span className="flex-1">{rotulo}</span>
+      {seta && <Icone nome="direita" className="size-4 text-suave" />}
+    </button>
+  );
+  const escuro = document.documentElement.classList.contains("dark");
+
   return (
-    <a href="/conta" onClick={aoClicar("/conta")} className="flex items-center gap-2 rounded-full border border-borda bg-painel p-1 text-sm hover:bg-painel-2 sm:pr-3">
-      <Avatar nome={leitor.nome} url={leitor.avatar} />
-      <span className="hidden max-w-28 truncate sm:inline">{leitor.nome.split(" ")[0]}</span>
-      {leitor.assinante && <SeloAssinante />}
-    </a>
+    <div ref={caixa} className="relative">
+      <button
+        onClick={() => setAberto(!aberto)}
+        aria-label="Menu da conta"
+        aria-expanded={aberto}
+        className="flex items-center gap-2 rounded-full border border-borda bg-painel p-1 text-sm hover:bg-painel-2 sm:pr-3"
+      >
+        <Avatar nome={leitor.nome} url={leitor.avatar} />
+        <span className="hidden max-w-28 truncate sm:inline">{leitor.nome.split(" ")[0]}</span>
+        {leitor.fundador ? <span className="hidden sm:inline"><SeloFundador numero={leitor.fundador.numero} compacto /></span> : leitor.assinante && <SeloAssinante />}
+      </button>
+
+      {aberto && (
+        <div className="absolute right-0 top-full z-50 mt-2 max-h-[80dvh] w-80 overflow-y-auto rounded-xl border border-borda bg-painel py-2 shadow-2xl">
+          <div className="flex gap-3 px-4 pb-3 pt-1">
+            <Avatar nome={leitor.nome} url={leitor.avatar} tamanho="size-10" />
+            <div className="min-w-0">
+              <p className="truncate font-semibold">{leitor.nome}</p>
+              <p className="truncate text-sm text-suave">{leitor.user.email}</p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {leitor.fundador && <SeloFundador numero={leitor.fundador.numero} />}
+                {leitor.assinante && <SeloAssinante />}
+              </div>
+              <button onClick={() => ir("/conta")} className="mt-1 text-sm font-medium text-globo hover:underline">Ver minha conta</button>
+            </div>
+          </div>
+          <div className="border-t border-borda py-1">
+            <Item icone="usuario" rotulo="Perfil e pontos" onClick={() => ir("/conta#perfil")} />
+            <Item icone="comentario" rotulo="Minha atividade" onClick={() => ir("/conta#atividade")} />
+            <Item icone="estrela" rotulo={leitor.assinante ? "Minha assinatura Pro" : "Assinar o Pro"} onClick={() => ir(leitor.assinante ? "/conta#assinatura" : "/assinar")} />
+          </div>
+          <div className="border-t border-borda py-1">
+            {leitor.fundador ? (
+              <>
+                <Item icone="jornal" rotulo="Meu certificado de fundador" onClick={() => ir("/fundadores/certificado")} />
+                <Item icone="checkCirculo" rotulo="Votação de pautas" onClick={() => ir("/fundadores/votacao")} />
+              </>
+            ) : (
+              <Item icone="trofeu" rotulo="Ser fundador por R$ 15,90" onClick={() => ir("/fundadores")} />
+            )}
+            <Item icone="usuario" rotulo="Mural dos Fundadores" onClick={() => ir("/fundadores/mural")} />
+          </div>
+          <div className="border-t border-borda py-1">
+            <Item icone={escuro ? "sol" : "lua"} rotulo={`Aparência: ${escuro ? "escuro" : "claro"}`} onClick={alternarTema} />
+            {instalar?.tipo === "prompt" && <Item icone="instalar" rotulo="Instalar o app" onClick={() => instalar.instalar()} />}
+            {leitor.admin && (
+              <Item
+                icone="ajustes"
+                rotulo="Painel admin"
+                onClick={() => {
+                  window.location.href = "/painel";
+                }}
+              />
+            )}
+          </div>
+          <div className="border-t border-borda py-1">
+            <Item icone="cadeado" rotulo="Privacidade e dados" onClick={() => ir("/conta#privacidade")} />
+            <Item
+              icone="sair"
+              rotulo="Sair"
+              onClick={() => {
+                setAberto(false);
+                sair().then(() => navegar("/"));
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

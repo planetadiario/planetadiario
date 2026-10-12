@@ -55,6 +55,15 @@ site.get("/assinatura/:fatura", async (c) => {
   return c.json({ status: "pendente" });
 });
 
+// LGPD: o leitor pode apagar a própria conta e os dados ligados a ela
+site.delete("/conta", async (c) => {
+  const user = await leitor(c);
+  if (!user) return c.json({ erro: "faça login" }, 401);
+  const { error } = await supa(c.env).auth.admin.deleteUser(user.id);
+  if (error) throw error;
+  return c.json({ ok: true });
+});
+
 // ---------- Clube de Fundadores (pagamento único) ----------
 
 site.post("/fundador", async (c) => {

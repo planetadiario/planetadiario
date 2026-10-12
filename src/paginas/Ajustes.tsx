@@ -25,6 +25,8 @@ interface Cfg {
   aprendizados: Aprendizados;
   telegram_canais?: string[];
   intervalo_min_minutos?: number;
+  cta_facebook?: string;
+  cta_instagram?: string;
 }
 
 const CANAIS_TELEGRAM_PADRAO = ["Breaking911", "bnonews", "disclosetv", "insiderpaper", "wfwitness", "ClashReport", "WarMonitors", "metropoles", "cnnbrasil", "g1noticias"];
@@ -122,7 +124,20 @@ export default function Ajustes() {
       )}
 
       {aba === "reel" && (
-        <section className="cartao max-w-3xl p-6">
+        <div className="grid gap-5 xl:grid-cols-2">
+        <section className="cartao p-6">
+          <h3 className="mb-1 font-semibold">Chamada no fim da legenda</h3>
+          <p className="mb-3 text-sm text-suave">Entra em todo post, entre a legenda e as hashtags. Deixe vazio para não usar.</p>
+          <label className="mb-3 block text-sm">
+            <span className="mb-1 block text-suave">Facebook (link funciona na legenda)</span>
+            <input defaultValue={cfg.cta_facebook ?? ""} onBlur={(e) => gravar("cta_facebook", e.target.value.trim())} className="w-full rounded-lg border border-borda bg-fundo px-3 py-2.5" />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-suave">Instagram (link não é clicável: use "link na bio")</span>
+            <input defaultValue={cfg.cta_instagram ?? ""} onBlur={(e) => gravar("cta_instagram", e.target.value.trim())} className="w-full rounded-lg border border-borda bg-fundo px-3 py-2.5" />
+          </label>
+        </section>
+        <section className="cartao p-6">
           <h3 className="mb-1 font-semibold">Rodapé do vídeo</h3>
           <p className="mb-3 text-sm text-suave">Linha vermelha abaixo da manchete em todos os Reels.</p>
           <input
@@ -132,6 +147,7 @@ export default function Ajustes() {
             className="w-full rounded-lg border border-borda bg-fundo px-3 py-2.5 text-sm"
           />
         </section>
+        </div>
       )}
 
       {aba === "fontes" && (

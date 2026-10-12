@@ -141,7 +141,12 @@ async function publicar(env: Bindings, id: string) {
 
   await db.from("reels").update({ status: "publicando", erro: null }).eq("id", id);
   const tags = (reel.hashtags as string[]).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
-  const descricao = [reel.legenda, tags].filter(Boolean).join("\n\n");
+  // chamada do Clube de Fundadores no fim de cada legenda (texto próprio por rede; editável em Ajustes)
+  const { data: ctas } = await db.from("config").select("chave, valor").in("chave", ["cta_facebook", "cta_instagram"]);
+  const cta = Object.fromEntries((ctas ?? []).map((c) => [c.chave, String(c.valor ?? "")]));
+  const montar = (chamada?: string) => [reel.legenda, chamada, tags].filter(Boolean).join("\n\n");
+  const descricao = montar(cta.cta_facebook);
+  const descricaoIg = montar(cta.cta_instagram);
 
   // Facebook (obrigatório)
   let fbUrl: string | null = reel.fb_post_url;
@@ -167,7 +172,7 @@ async function publicar(env: Bindings, id: string) {
     await db.from("reels").update({ erro: "Instagram: falta a versão do Instagram; clique em Refazer e publique de novo" }).eq("id", id);
   } else if (!reel.ig_media_id) {
     try {
-      const ig = await publicarReelInstagram(env, reel.video_ig_url, descricao);
+      const ig = await publicarReelInstagram(env, reel.video_ig_url, descricaoIg);
       if (ig) {
         igUrl = ig.url;
         await db.from("reels").update({ ig_media_id: ig.mediaId, ig_post_url: ig.url }).eq("id", id);
