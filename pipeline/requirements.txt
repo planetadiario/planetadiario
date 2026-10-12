@@ -3,3 +3,4 @@ yt-dlp[default,curl-cffi]
 requests>=2.32
 pillow>=11.0
 piper-tts
+faster-whisper

@@ -189,6 +189,15 @@ function CartaoReel({ reel }: { reel: Reel }) {
               Ver no Instagram
             </a>
           )}
+          {reel.status === "publicado" && !reel.ig_post_url && (
+            <button
+              disabled={ocupado}
+              onClick={() => acao(() => api(`/reels/${reel.id}/publicar`, { method: "POST" }))}
+              className="rounded-lg bg-ig px-3 py-1.5 font-semibold text-white disabled:opacity-60"
+            >
+              Tentar Instagram de novo
+            </button>
+          )}
           {reel.status === "pronto" && (
             <button
               disabled={ocupado}

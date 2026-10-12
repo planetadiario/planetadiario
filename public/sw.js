@@ -1,7 +1,7 @@
 // Service worker do Planeta Diário: app instalável e abre rápido/offline.
 // Navegação: rede primeiro (cai no cache se offline). Assets com hash: cache primeiro.
 // Nunca guarda API, Supabase nem vídeos.
-const CACHE = "pd-v1";
+const CACHE = "pd-v2";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/painel", "/logo.png", "/icone-192.png"])));

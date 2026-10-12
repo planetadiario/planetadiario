@@ -36,7 +36,8 @@ def narrar(texto: str, destino: Path, voz: str = "cadu") -> list[tuple[float, fl
     """
     from piper import PiperVoice
 
-    v = PiperVoice.load(str(garantir_voz(voz)))
+    grave = voz.endswith("-grave")
+    v = PiperVoice.load(str(garantir_voz(voz.removesuffix("-grave"))))
     pausa = 0.18
     trechos: list[tuple[float, float, str]] = []
     quadros = b""
@@ -75,7 +76,23 @@ def narrar(texto: str, destino: Path, voz: str = "cadu") -> list[tuple[float, fl
         w.setsampwidth(largura)
         w.setframerate(taxa)
         w.writeframes(quadros)
+    if grave:
+        engrossar(destino, taxa)
     return trechos
+
+
+def engrossar(arq: Path, taxa: int, fator: float = 0.86) -> None:
+    """Abaixa o tom da voz (~2,5 semitons) mantendo a duração, para soar mais grave."""
+    import subprocess
+
+    tmp = arq.with_suffix(".grave.wav")
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(arq),
+         "-af", f"asetrate={int(taxa * fator)},aresample={taxa},atempo={1 / fator:.4f},bass=g=3",
+         str(tmp)],
+        check=True,
+    )
+    tmp.replace(arq)
 
 
 def _tempo(s: float) -> str:

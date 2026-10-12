@@ -1,6 +1,7 @@
 export interface Bindings {
   ASSETS: Fetcher;
   SUPABASE_URL: string;
+  SITE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   ANTHROPIC_API_KEY: string;
   IA_MODELO: string;

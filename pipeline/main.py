@@ -153,10 +153,23 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             # ~2,5 palavras por segundo, no máximo 40 s de fala
             "limite_palavras_narracao": int(min(40, max(8, (meta.get("duracao") or 30))) * 2.5),
         }
+        # entender o vídeo: fala original (Whisper) + quadros para a IA ver
+        imagens: list[str] = []
+        try:
+            from entender import quadros, transcrever
+            print("👂 transcrevendo o áudio original")
+            fala = transcrever(video)
+            if fala["texto"]:
+                contexto["transcricao_original"] = fala["texto"]
+                contexto["idioma_original"] = fala["idioma"]
+            imagens = quadros(video, pasta, meta.get("duracao") or 30)
+        except Exception as e:  # sem isso a IA escreve só com título/descrição
+            print("aviso: não foi possível analisar o vídeo:", e)
+
         print("✍️  escrevendo textos")
         cfg_apr = db_get("config", "chave=eq.aprendizados", "valor")
         aprendizados = (cfg_apr[0]["valor"] or {}).get("texto", "") if cfg_apr else ""
-        textos = gerar_textos(contexto, aprendizados)
+        textos = gerar_textos(contexto, aprendizados, imagens)
         # categoria: a IA confirma pelo assunto, a menos que tenha sido escolhida a dedo
         if reel.get("categoria_auto", True) and textos.get("categoria") and textos["categoria"] != reel["categoria"]:
             print(f"🏷️  categoria: {reel['categoria']} → {textos['categoria']}")

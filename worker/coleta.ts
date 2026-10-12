@@ -51,6 +51,13 @@ export async function coletar(env: Bindings, forcarGrupo?: "par" | "impar") {
   const cfg = await lerConfig(db);
   const log: string[] = [];
 
+  // destrava publicações interrompidas (ficam "publicando" se a execução cair no meio)
+  await db
+    .from("reels")
+    .update({ status: "pronto", erro: "A publicação foi interrompida. Clique em Publicar de novo." })
+    .eq("status", "publicando")
+    .lt("atualizado_em", new Date(Date.now() - 10 * 60_000).toISOString());
+
   // Brasil em toda rodada; os outros países em rodízio
   const rodada = Math.floor(Date.now() / 300_000);
   const meia = Math.floor(rodada / 2);

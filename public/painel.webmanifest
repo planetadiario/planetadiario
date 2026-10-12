@@ -7,7 +7,7 @@
   "scope": "/painel",
   "display": "standalone",
   "background_color": "#111111",
-  "theme_color": "#111111",
+  "theme_color": "#e5121b",
   "lang": "pt-BR",
   "icons": [
     {

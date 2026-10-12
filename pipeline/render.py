@@ -124,7 +124,8 @@ def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
         ass = legendas_ass(trechos or [], saida.with_suffix(f".{rede}.ass"), layout["legenda_margem"])
         # o filtro de legendas roda com a pasta de saída como diretório atual (caminhos simples)
         # fonte estática ExtraBold só para a legenda (o libass não aplica peso de fonte variável)
-        shutil.copy(RAIZ / "fonts" / "Montserrat-Legenda.ttf", saida.parent / "Montserrat-Legenda.ttf")
+        (saida.parent / "fonte_legenda").mkdir(exist_ok=True)
+        shutil.copy(RAIZ / "fonts" / "Montserrat-Legenda.ttf", saida.parent / "fonte_legenda" / "Montserrat-Legenda.ttf")
 
     overlay = camada(molde, manchete, rodape, saida.with_suffix(".overlay.png"), layout)
     if info["vertical"]:
@@ -141,7 +142,7 @@ def montar(video: Path, molde: Path, manchete: str, rodape: str, saida: Path,
         # congela o último quadro se a fala for maior que o trecho do vídeo
         base = base.replace("[0:v]", "[0:v]tpad=stop_mode=clone:stop_duration=60,", 1) if info["vertical"] else \
             base.replace("[0:v]scale", "[0:v]tpad=stop_mode=clone:stop_duration=60,scale", 2)
-        filtro = base + f"[v1][1:v]overlay=0:0,subtitles={ass.name}:fontsdir=.,fps=30,format=yuv420p[v]"
+        filtro = base + f"[v1][1:v]overlay=0:0,subtitles={ass.name}:fontsdir=fonte_legenda,fps=30,format=yuv420p[v]"
         if info["tem_audio"]:
             filtro += ";[0:a]volume=0.15[a0];[2:a]volume=1.5[a1];[a0][a1]amix=inputs=2:duration=longest:normalize=0[a]"
         else:

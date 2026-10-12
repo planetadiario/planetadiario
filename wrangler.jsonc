@@ -21,6 +21,7 @@
   "preview_urls": false,
   "vars": {
     "SUPABASE_URL": "https://ilnmrhgnaojgykkresfi.supabase.co",
+    "SITE_URL": "https://planetadiario.online",
     "GITHUB_REPO": "planetadiario/planetadiario",
     "FB_GRAPH_VERSION": "v23.0",
     // IA: "moonshotai/kimi-k3" (NVIDIA, grátis) ou "claude-opus-5-5" (Anthropic)

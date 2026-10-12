@@ -31,7 +31,12 @@ app.use("*", async (c, next) => {
 // Rotas internas (chamadas pelo pipeline do GitHub Actions)
 app.post("/interno/publicar/:id", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
-  return c.json(await publicar(c.env, c.req.param("id")));
+  return c.json(await publicar(c.env, c.req.param("id"), c.executionCtx));
+});
+
+app.post("/interno/publicar-instagram/:id", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  return c.json(await publicarInstagram(c.env, c.req.param("id")));
 });
 
 app.post("/interno/apagar-instagram/:id", async (c) => {
@@ -154,9 +159,24 @@ app.post("/reels/:id/renderizar", async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/reels/:id/publicar", async (c) => c.json(await publicar(c.env, c.req.param("id"))));
+app.post("/reels/:id/publicar", async (c) => c.json(await publicar(c.env, c.req.param("id"), c.executionCtx)));
 
-async function publicar(env: Bindings, id: string) {
+async function legendas(env: Bindings, reel: { legenda: string | null; hashtags: string[] }) {
+  const db = supa(env);
+  const tags = (reel.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
+  // chamada do Clube de Fundadores no fim de cada legenda (texto próprio por rede; editável em Ajustes)
+  const { data: ctas } = await db.from("config").select("chave, valor").in("chave", ["cta_facebook", "cta_instagram"]);
+  const cta = Object.fromEntries((ctas ?? []).map((c) => [c.chave, String(c.valor ?? "")]));
+  const montar = (chamada?: string) => [reel.legenda, chamada, tags].filter(Boolean).join("\n\n");
+  return { facebook: montar(cta.cta_facebook), instagram: montar(cta.cta_instagram) };
+}
+
+/**
+ * Publica no Facebook e no site, e dispara o Instagram numa execução separada:
+ * o Instagram consulta o processamento várias vezes e estouraria o limite de
+ * conexões por execução do plano grátis da Cloudflare.
+ */
+async function publicar(env: Bindings, id: string, ctx?: { waitUntil(p: Promise<unknown>): void }) {
   const db = supa(env);
   const { data: reel, error } = await db.from("reels").select("*").eq("id", id).single();
   if (error) throw error;
@@ -164,23 +184,17 @@ async function publicar(env: Bindings, id: string) {
   if (reel.fb_video_id && reel.ig_media_id) return { ok: true, url: reel.fb_post_url };
 
   await db.from("reels").update({ status: "publicando", erro: null }).eq("id", id);
-  const tags = (reel.hashtags as string[]).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
-  // chamada do Clube de Fundadores no fim de cada legenda (texto próprio por rede; editável em Ajustes)
-  const { data: ctas } = await db.from("config").select("chave, valor").in("chave", ["cta_facebook", "cta_instagram"]);
-  const cta = Object.fromEntries((ctas ?? []).map((c) => [c.chave, String(c.valor ?? "")]));
-  const montar = (chamada?: string) => [reel.legenda, chamada, tags].filter(Boolean).join("\n\n");
-  const descricao = montar(cta.cta_facebook);
-  const descricaoIg = montar(cta.cta_instagram);
+  const textos = await legendas(env, reel);
 
   // Facebook (obrigatório)
   let fbUrl: string | null = reel.fb_post_url;
   if (!reel.fb_video_id) {
     try {
-      const fb = await publicarReel(env, reel.video_url, descricao);
+      const fb = await publicarReel(env, reel.video_url, textos.facebook);
       fbUrl = fb.url;
       await db
         .from("reels")
-        .update({ status: "publicado", fb_video_id: fb.videoId, fb_post_url: fb.url, publicado_em: new Date().toISOString() })
+        .update({ fb_video_id: fb.videoId, fb_post_url: fb.url, publicado_em: new Date().toISOString() })
         .eq("id", id);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -189,37 +203,48 @@ async function publicar(env: Bindings, id: string) {
     }
   }
 
-  // Instagram (se houver conta profissional vinculada à página); falha aqui não desfaz o Facebook
-  let igUrl: string | null = reel.ig_post_url;
-  if (!reel.ig_media_id && !reel.video_ig_url) {
-    // nunca posta no Instagram a versão do Facebook: falta a versão na área segura
-    await db.from("reels").update({ erro: "Instagram: falta a versão do Instagram; clique em Refazer e publique de novo" }).eq("id", id);
-  } else if (!reel.ig_media_id) {
-    try {
-      const ig = await publicarReelInstagram(env, reel.video_ig_url, descricaoIg);
-      if (ig) {
-        igUrl = ig.url;
-        await db.from("reels").update({ ig_media_id: ig.mediaId, ig_post_url: ig.url }).eq("id", id);
-      }
-    } catch (e) {
-      await db.from("reels").update({ erro: `Instagram: ${e instanceof Error ? e.message : e}` }).eq("id", id);
-    }
-  }
   // Site: assinantes veem na hora; o público, depois do acesso antecipado
+  const extra: Record<string, unknown> = { status: "publicado" };
   if (!reel.site_publicado_em) {
     const { data: cfg } = await db.from("config").select("valor").eq("chave", "acesso_antecipado_min").maybeSingle();
     const agora = Date.now();
-    await db
-      .from("reels")
-      .update({
-        slug: reel.slug ?? slugify(reel.manchete ?? reel.origem_titulo ?? "noticia", id),
-        site_publicado_em: new Date(agora).toISOString(),
-        liberado_em: new Date(agora + Number(cfg?.valor ?? 30) * 60_000).toISOString(),
-      })
-      .eq("id", id);
+    extra.slug = reel.slug ?? slugify(reel.manchete ?? reel.origem_titulo ?? "noticia", id);
+    extra.site_publicado_em = new Date(agora).toISOString();
+    extra.liberado_em = new Date(agora + Number(cfg?.valor ?? 30) * 60_000).toISOString();
   }
-  await db.from("reels").update({ status: "publicado" }).eq("id", id);
-  return { ok: true, url: fbUrl, instagram: igUrl };
+  await db.from("reels").update(extra).eq("id", id);
+
+  // Instagram em outra execução (limite próprio de conexões)
+  if (!reel.ig_media_id) {
+    const chamada = fetch(`${env.SITE_URL}/api/interno/publicar-instagram/${id}`, {
+      method: "POST",
+      headers: { "x-internal-secret": env.INTERNAL_SECRET },
+    });
+    if (ctx) ctx.waitUntil(chamada);
+    else await chamada;
+  }
+  return { ok: true, url: fbUrl, instagram: reel.ig_post_url ?? "publicando" };
+}
+
+/** Instagram (conta profissional vinculada à página); falha aqui não desfaz o Facebook */
+async function publicarInstagram(env: Bindings, id: string) {
+  const db = supa(env);
+  const { data: reel } = await db.from("reels").select("*").eq("id", id).single();
+  if (!reel || reel.ig_media_id) return { ok: true };
+  if (!reel.video_ig_url) {
+    // nunca posta no Instagram a versão do Facebook: falta a versão na área segura
+    await db.from("reels").update({ erro: "Instagram: falta a versão do Instagram; clique em Refazer e publique de novo" }).eq("id", id);
+    return { ok: false };
+  }
+  try {
+    const textos = await legendas(env, reel);
+    const ig = await publicarReelInstagram(env, reel.video_ig_url, textos.instagram);
+    if (ig) await db.from("reels").update({ ig_media_id: ig.mediaId, ig_post_url: ig.url, erro: null }).eq("id", id);
+    return { ok: true, url: ig?.url };
+  } catch (e) {
+    await db.from("reels").update({ erro: `Instagram: ${e instanceof Error ? e.message : e}` }).eq("id", id);
+    return { ok: false };
+  }
 }
 
 function slugify(texto: string, id: string) {

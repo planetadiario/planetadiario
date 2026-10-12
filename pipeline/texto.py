@@ -24,8 +24,7 @@ Você vai gerar:
 2. legenda: descrição do post no Facebook, com:
    - 1ª linha: gancho forte com 1 emoji (aparece antes do "ver mais", até ~100 caracteres);
    - 2 a 3 frases curtas de contexto;
-   - uma pergunta que convide a comentar (gera engajamento);
-   - linha final: "📌 Siga a Planeta Diário para acompanhar tudo que acontece no mundo."
+   - uma pergunta verdadeira sobre o assunto, que convide a comentar (nunca iscas como "comente SIM" ou "marque um amigo");
    - se houver autor/canal original, inclua "🎥 Créditos: <autor>".
    Não coloque hashtags dentro da legenda.
 3. artigo: texto da notícia para o site, com 2 a 4 parágrafos curtos (separados por linha em branco), em tom jornalístico, explicando o que aconteceu com os fatos disponíveis. Sem título, sem emoji, sem hashtag, sem inventar.
@@ -39,7 +38,9 @@ Você vai gerar:
 6. narracao: o texto que um narrador de telejornal vai LER em voz alta sobre o vídeo, em português do Brasil:
    - começa pelo fato mais impactante (o gancho tem que prender nos 2 primeiros segundos);
    - 2 a 4 frases curtas, linguagem falada e natural, sem emoji, sem hashtag, sem siglas difíceis;
-   - explica o que aparece no vídeo e o contexto, traduzindo o que estiver em outra língua;
+   - acompanha o vídeo NA ORDEM: narra o que aparece em cada parte (use os quadros e a "transcricao_original"),
+     citando os itens, nomes e textos que aparecem na tela — nada genérico como "uma seleção reúne fenômenos";
+   - traduz para o português o que for dito ou escrito em outra língua;
    - respeite o limite de palavras informado ("limite_palavras_narracao");
    - 100% fiel aos fatos, sem inventar nada."""
 
@@ -71,7 +72,7 @@ def sistema(aprendizados: str = "") -> str:
             "sem nunca sacrificar a veracidade):\n" + aprendizados)
 
 
-def _nvidia(modelo: str, usuario: str, prompt: str) -> dict:
+def _nvidia(modelo: str, usuario: str, prompt: str, imagens: list[str]) -> dict:
     r = requests.post(
         "https://integrate.api.nvidia.com/v1/chat/completions",
         headers={"Authorization": f"Bearer {os.environ['NVIDIA_API_KEY']}"},
@@ -79,7 +80,9 @@ def _nvidia(modelo: str, usuario: str, prompt: str) -> dict:
             "model": modelo, "max_tokens": 8000, "temperature": 0.6,
             "messages": [
                 {"role": "system", "content": prompt + "\n\nResponda APENAS com JSON válido neste esquema:\n" + json.dumps(ESQUEMA)},
-                {"role": "user", "content": usuario},
+                {"role": "user", "content": [{"type": "text", "text": usuario}] + [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b}"}} for b in imagens
+                ]},
             ],
         },
         timeout=300,
@@ -92,11 +95,15 @@ def _nvidia(modelo: str, usuario: str, prompt: str) -> dict:
     return json.loads(m.group(0))
 
 
-def gerar_textos(contexto: dict, aprendizados: str = "") -> dict:
+def gerar_textos(contexto: dict, aprendizados: str = "", imagens: list[str] | None = None) -> dict:
     modelo = os.environ.get("IA_MODELO", "moonshotai/kimi-k3")
+    imagens = imagens or []
     usuario = "Informações sobre o vídeo:\n" + json.dumps(contexto, ensure_ascii=False, indent=2)
+    if imagens:
+        usuario += (f"\n\nAs {len(imagens)} imagens anexadas são quadros do vídeo, em ordem. Use-as (e a transcrição) para saber "
+                    "o que realmente aparece e o que está escrito na tela.")
     prompt = sistema(aprendizados)
-    dados = _claude(modelo, usuario, prompt) if modelo.startswith("claude") else _nvidia(modelo, usuario, prompt)
+    dados = _claude(modelo, usuario, prompt, imagens) if modelo.startswith("claude") else _nvidia(modelo, usuario, prompt, imagens)
     if dados.get("categoria") not in CATEGORIAS:
         dados["categoria"] = None
     dados["manchete"] = dados["manchete"].strip().rstrip(".")[:120]
@@ -106,7 +113,7 @@ def gerar_textos(contexto: dict, aprendizados: str = "") -> dict:
     return dados
 
 
-def _claude(modelo: str, usuario: str, prompt: str) -> dict:
+def _claude(modelo: str, usuario: str, prompt: str, imagens: list[str]) -> dict:
     client = anthropic.Anthropic()
     resposta = client.beta.messages.create(
         model=modelo,
@@ -117,7 +124,9 @@ def _claude(modelo: str, usuario: str, prompt: str) -> dict:
         system=prompt,
         messages=[{
             "role": "user",
-            "content": usuario,
+            "content": [{"type": "text", "text": usuario}] + [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b}} for b in imagens
+            ],
         }],
     )
     if resposta.stop_reason == "refusal":

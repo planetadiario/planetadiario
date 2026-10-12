@@ -53,8 +53,8 @@ export async function publicarReelInstagram(env: Bindings, videoUrl: string, leg
   const container = (await fbJson(await fetch(`${g}/${igId}/media`, { method: "POST", body: params }))) as { id: string };
 
   // o Instagram processa o vídeo antes de liberar a publicação
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 8000));
+  for (let i = 0; i < 24; i++) {
+    await new Promise((r) => setTimeout(r, 10_000));
     const st = (await fbJson(await fetch(`${g}/${container.id}?fields=status_code&access_token=${token}`))) as { status_code: string };
     if (st.status_code === "FINISHED") break;
     if (st.status_code === "ERROR" || st.status_code === "EXPIRED") throw new Error(`Instagram: processamento ${st.status_code}`);
