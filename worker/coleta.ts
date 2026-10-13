@@ -294,7 +294,7 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
   const { data: recentes } = await db
     .from("reels")
     .select("origem_url, origem_titulo, manchete")
-    .not("status", "in", "(rejeitado,erro)")
+    .neq("status", "rejeitado")
     .gte("criado_em", new Date(Date.now() - 24 * 3600_000).toISOString());
   const assuntos = (recentes ?? []).map((r) => palavras(`${r.origem_titulo ?? ""} ${r.manchete ?? ""}`));
   const manchetes = (recentes ?? []).map((r) => r.manchete ?? r.origem_titulo).filter(Boolean) as string[];

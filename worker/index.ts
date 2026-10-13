@@ -97,6 +97,11 @@ app.post("/interno/aprendizados", async (c) => {
   return c.json(await gerarAprendizados(c.env));
 });
 
+app.post("/interno/facebook-pendente", async (c) => {
+  if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
+  return c.json(await facebookPendente(c.env));
+});
+
 app.post("/interno/instagram-pendente", async (c) => {
   if (c.req.header("x-internal-secret") !== c.env.INTERNAL_SECRET) return c.json({ erro: "não autorizado" }, 401);
   return c.json({ ok: true, resultado: await instagramPendente(c.env) });
@@ -333,39 +338,12 @@ async function publicar(env: Bindings, id: string) {
   const { data: reel, error } = await db.from("reels").select("*").eq("id", id).single();
   if (error) throw error;
   if (!reel.video_url) throw new Error("o vídeo ainda não está pronto");
-  if (reel.fb_video_id && reel.ig_media_id) return { ok: true, url: reel.fb_post_url };
+  if (reel.status === "publicado" && reel.fb_video_id && reel.ig_media_id) return { ok: true, url: reel.fb_post_url };
 
-  await db.from("reels").update({ status: "publicando", erro: null }).eq("id", id);
-  const textos = await legendas(env, reel);
-
-  // Facebook (obrigatório)
-  let fbUrl: string | null = reel.fb_post_url;
-  if (!reel.fb_video_id) {
-    try {
-      const fb = await publicarReel(env, reel.video_url, textos.facebook);
-      fbUrl = fb.url;
-      await db
-        .from("reels")
-        .update({ fb_video_id: fb.videoId, fb_post_url: fb.url, publicado_em: new Date().toISOString() })
-        .eq("id", id);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      await db.from("reels").update({ status: "pronto", erro: msg }).eq("id", id);
-      throw e;
-    }
-  }
-
-  // Story da página: avisa os seguidores (falha aqui não impede a publicação)
-  const extra: Record<string, unknown> = { status: "publicado" };
-  if (!reel.fb_story_id) {
-    try {
-      extra.fb_story_id = await publicarStoryFacebook(env, reel.video_url);
-    } catch (e) {
-      console.log("story do Facebook falhou:", e instanceof Error ? e.message : e);
-    }
-  }
-
-  // Site: assinantes veem na hora; o público, depois do acesso antecipado
+  // publica primeiro no site e marca como publicado: Instagram e as outras redes seguem sozinhos,
+  // e o Facebook entra na fila própria dele (nunca mais um erro do Facebook segura o resto)
+  const extra: Record<string, unknown> = { status: "publicado", erro: null };
+  if (!reel.publicado_em) extra.publicado_em = new Date().toISOString();
   if (!reel.site_publicado_em) {
     const { data: cfg } = await db.from("config").select("valor").eq("chave", "acesso_antecipado_min").maybeSingle();
     const agora = Date.now();
@@ -375,9 +353,66 @@ async function publicar(env: Bindings, id: string) {
   }
   await db.from("reels").update(extra).eq("id", id);
 
+  const facebook = reel.fb_video_id ? "ok" : await tentarFacebook(env, { ...reel, ...extra });
   // o Instagram é publicado numa chamada separada (leva ~45 s e muitas consultas):
-  // navegador, pipeline ou o agendamento de pendências chamam /instagram em seguida
-  return { ok: true, url: fbUrl, instagram: reel.ig_post_url ?? "pendente" };
+  // pipeline, navegador ou o agendamento de pendências chamam /instagram em seguida
+  return { ok: true, url: reel.fb_post_url, facebook, instagram: reel.ig_post_url ?? "pendente" };
+}
+
+/**
+ * Facebook com fila e ritmo próprios. Página nova é limitada pelo antispam do Facebook:
+ * respeita um intervalo mínimo entre posts e, se o Facebook limitar, pausa só o Facebook por 2 h.
+ */
+async function tentarFacebook(env: Bindings, reel: Record<string, any>): Promise<string> {
+  const db = supa(env);
+  const { data: cfgs } = await db.from("config").select("chave, valor").in("chave", ["fb_pausa_ate", "fb_intervalo_min", "fb_story"]);
+  const cfg = Object.fromEntries((cfgs ?? []).map((c) => [c.chave, c.valor]));
+  const pausa = Date.parse(String(cfg.fb_pausa_ate ?? ""));
+  if (pausa > Date.now()) return `pausado até ${new Date(pausa).toISOString()}`;
+
+  const { data: ultimo } = await db
+    .from("reels")
+    .select("fb_publicado_em")
+    .not("fb_publicado_em", "is", null)
+    .order("fb_publicado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const intervalo = Number(cfg.fb_intervalo_min ?? 60);
+  if (ultimo?.fb_publicado_em && Date.now() - Date.parse(ultimo.fb_publicado_em) < intervalo * 60_000) return "na fila (intervalo do Facebook)";
+
+  try {
+    const textos = await legendas(env, reel as { legenda: string | null; hashtags: string[] });
+    const fb = await publicarReel(env, reel.video_url, textos.facebook);
+    const dados: Record<string, unknown> = { fb_video_id: fb.videoId, fb_post_url: fb.url, fb_publicado_em: new Date().toISOString() };
+    if (cfg.fb_story === true && !reel.fb_story_id) {
+      dados.fb_story_id = await publicarStoryFacebook(env, reel.video_url).catch(() => null);
+    }
+    await db.from("reels").update(dados).eq("id", reel.id);
+    return "ok";
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/frequência|spam|limit|368|too many|rate/i.test(msg)) {
+      await db.from("config").upsert({ chave: "fb_pausa_ate", valor: new Date(Date.now() + 2 * 3600_000).toISOString() });
+      return "Facebook limitou: pausado por 2 h";
+    }
+    await db.from("reels").update({ redes_erro: { ...(reel.redes_erro ?? {}), facebook: msg.slice(0, 300) } }).eq("id", reel.id);
+    return `erro: ${msg.slice(0, 120)}`;
+  }
+}
+
+/** Fila do Facebook: publica o Reel mais recente (até 6 h) que ainda não foi para o Facebook */
+async function facebookPendente(env: Bindings) {
+  const { data } = await supa(env)
+    .from("reels")
+    .select("*")
+    .eq("status", "publicado")
+    .is("fb_video_id", null)
+    .is("redes_erro->>facebook", null)
+    .not("video_url", "is", null)
+    .gte("publicado_em", new Date(Date.now() - 6 * 3600_000).toISOString())
+    .order("publicado_em", { ascending: false })
+    .limit(1);
+  return data?.[0] ? { reel: data[0].id, facebook: await tentarFacebook(env, data[0]) } : { facebook: "nada pendente" };
 }
 
 /** Instagram (conta profissional vinculada à página); falha aqui não desfaz o Facebook */
@@ -409,7 +444,6 @@ async function instagramPendente(env: Bindings) {
     .eq("status", "publicado")
     .is("ig_media_id", null)
     .not("video_ig_url", "is", null)
-    .not("fb_video_id", "is", null)
     .gte("publicado_em", new Date(Date.now() - 24 * 3600_000).toISOString())
     .lt("publicado_em", new Date(Date.now() - 3 * 60_000).toISOString())
     .order("publicado_em", { ascending: true })
@@ -449,7 +483,7 @@ export default {
     // o cron só dispara; o GitHub Actions chama a rota interna, que pode levar minutos
     const agora = new Date(ctrl.scheduledTime);
     let rota = "coletar";
-    if (ctrl.cron === CRON_INSTAGRAM) rota = ["instagram-pendente", ...REDES.map((r) => `redes/${r}`)].join(" ");
+    if (ctrl.cron === CRON_INSTAGRAM) rota = ["instagram-pendente", "facebook-pendente", ...REDES.map((r) => `redes/${r}`)].join(" ");
     else if (ctrl.cron === CRON_METRICAS) {
       // uma vez por dia (6h05 em Brasília) a IA revisa o desempenho e atualiza os aprendizados
       rota = agora.getUTCHours() === 9 && agora.getUTCMinutes() < 30 ? "aprendizados" : "metricas metricas-redes";
