@@ -40,7 +40,7 @@ Você vai gerar:
      (b) há texto na tela em outra língua essencial para entender; ou (c) sem explicação o vídeo não faz sentido.
    - false quando: alguém fala em português; o som original é o conteúdo (animal, música, reação, humor,
      momento emocionante, impacto, multidão); o vídeo se explica sozinho pelas imagens.
-7. narracao: o texto que um narrador de telejornal vai LER em voz alta sobre o vídeo, em português do Brasil:
+7. narracao: SEMPRE escreva (a versão do Facebook é sempre narrada, mesmo com usar_narracao=false). É o texto que um narrador de telejornal vai LER em voz alta sobre o vídeo, em português do Brasil:
    - começa pelo fato mais impactante (o gancho tem que prender nos 2 primeiros segundos);
    - 2 a 4 frases curtas, linguagem falada e natural, sem emoji, sem hashtag, sem siglas difíceis;
    - acompanha o vídeo NA ORDEM: narra o que aparece em cada parte (use os quadros e a "transcricao_original"),

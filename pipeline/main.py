@@ -192,9 +192,12 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
             narrar_agora = False
         else:  # automático: ligado nos Ajustes + IA decide, e nunca por cima de fala em português
             narrar_agora = bool(narr_cfg.get("ativa")) and bool(textos.get("usar_narracao", True)) and not fala_pt
-        if narrar_agora and textos.get("narracao"):
+        # Facebook: narração própria sempre (o Facebook rebaixa vídeo reaproveitado sem comentário próprio);
+        # o Instagram segue a decisão normal, porque lá a entrega já é boa
+        narrar_fb = narrar_agora or (narr_cfg.get("facebook_sempre", True) and modo != "nao" and not fala_pt)
+        if (narrar_agora or narrar_fb) and textos.get("narracao"):
             from narracao import narrar
-            print("🎙️  narrando em português")
+            print("🎙️  narrando em português" + ("" if narrar_agora else " (só na versão do Facebook)"))
             narracao_wav = pasta / "narracao.wav"
             trechos = narrar(textos["narracao"], narracao_wav, narr_cfg.get("voz", "cadu"))
         elif fala_pt:
@@ -211,7 +214,8 @@ def processar(reel_id: str, auto_publicar: bool) -> None:
         print("🎬 montando versão Instagram")
         saida_ig = pasta / "reel-ig.mp4"
         montar(video, baixar_molde(reel["categoria"], pasta, "instagram"), textos["manchete"], rodape, saida_ig, *corte,
-               rede="instagram", narracao=narracao_wav, trechos=trechos)
+               rede="instagram", narracao=narracao_wav if narrar_agora else None,
+               trechos=trechos if (narrar_agora or not narracao_wav) else None)
 
         print("☁️  enviando")
         url_video = enviar_arquivo(f"{reel_id}.mp4", saida, "video/mp4")
