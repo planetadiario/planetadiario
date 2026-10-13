@@ -31,6 +31,7 @@ interface Cfg {
   narracao?: { ativa: boolean; voz: string };
   meta_posts_dia?: number;
   horarios_pico?: [number, number][];
+  grade_horarios?: string[];
   urgente_automatico?: boolean;
   adsense?: { client: string; slot_home: string; slot_artigo: string };
 }
@@ -99,7 +100,6 @@ export default function Ajustes() {
           <section className="cartao flex flex-col gap-6 p-6">
             <Faixa rotulo="Nota final mínima (60% IA + 40% buscas/views)" valor={cfg.score_minimo_auto} min={40} max={90} passo={5} aoMudar={(v) => gravar("score_minimo_auto", v)} />
             <Faixa rotulo="Máximo de Reels por dia" valor={cfg.max_posts_dia} min={1} max={30} aoMudar={(v) => gravar("max_posts_dia", v)} />
-            <Faixa rotulo="Intervalo mínimo entre posts (minutos)" valor={cfg.intervalo_min_minutos ?? 40} min={10} max={180} passo={5} aoMudar={(v) => gravar("intervalo_min_minutos", v)} />
             <label className="flex items-center justify-between gap-3 text-sm">
               <span>
                 <b className="block">Publicar URGENTE sozinho</b>
@@ -107,10 +107,7 @@ export default function Ajustes() {
               </span>
               <Chave ligada={!!cfg.urgente_automatico} onClick={() => gravar("urgente_automatico", !cfg.urgente_automatico)} />
             </label>
-            <Faixa rotulo="Meta mínima de posts por dia" valor={cfg.meta_posts_dia ?? 8} min={1} max={30} aoMudar={(v) => gravar("meta_posts_dia", v)} />
-            <p className="text-xs text-suave">
-              Publica só nos horários de pico ({(cfg.horarios_pico ?? [[7, 9], [11, 14], [17, 23]]).map(([a, b]) => `${a}h–${b}h`).join(", ")}). Se estiver atrás da meta do dia, aceita nota final 5 pontos menor.
-            </p>
+            <GradeHorarios grade={cfg.grade_horarios ?? GRADE_PADRAO} aoMudar={(g) => gravar("grade_horarios", g)} />
           </section>
         </div>
       )}
@@ -363,5 +360,43 @@ function ListaEditavel({ titulo, ajuda, valores, salvar }: { titulo: string; aju
         className="w-full rounded-lg border border-borda bg-fundo px-3 py-2.5 text-sm"
       />
     </section>
+  );
+}
+
+// mesma grade padrão do piloto (worker/coleta.ts): dados reais das grandes páginas de notícias
+const GRADE_PADRAO = ["08:00", "11:00", "12:30", "13:30", "15:00", "17:00", "19:00", "20:00", "21:00", "22:00"];
+
+/** Horários fixos de publicação: um Reel em cada horário; URGENTE fura a grade */
+function GradeHorarios({ grade, aoMudar }: { grade: string[]; aoMudar: (g: string[]) => void }) {
+  const [novo, setNovo] = useState("");
+  const ordenar = (g: string[]) => [...new Set(g)].sort();
+  return (
+    <div className="flex flex-col gap-2">
+      <b className="text-sm">Grade de horários ({grade.length} por dia)</b>
+      <div className="flex flex-wrap gap-2">
+        {grade.map((h) => (
+          <span key={h} className="flex items-center gap-1 rounded-full bg-painel-2 py-1 pl-3 pr-1 text-sm tabular-nums">
+            {h}
+            <button onClick={() => aoMudar(grade.filter((x) => x !== h))} title="Remover" className="grid size-6 place-items-center rounded-full hover:bg-fundo">
+              <Icone nome="fechar" className="size-3.5" />
+            </button>
+          </span>
+        ))}
+        <span className="flex items-center gap-1">
+          <input type="time" value={novo} onChange={(e) => setNovo(e.target.value)} className="rounded-lg border border-borda bg-fundo px-2 py-1 text-sm" />
+          <button
+            disabled={!novo}
+            onClick={() => { aoMudar(ordenar([...grade, novo])); setNovo(""); }}
+            className="rounded-lg bg-marca px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            Adicionar
+          </button>
+        </span>
+      </div>
+      <p className="text-xs text-suave">
+        Um Reel sai em cada horário (horário de Brasília), todos os dias, com a melhor notícia do momento. Notícias URGENTES saem na hora, fora da grade.
+        A grade padrão segue os horários de maior engajamento de 1.102 posts das maiores páginas de notícias do Brasil (13h, 15h, 17h, 19h, 21h e 22h).
+      </p>
+    </div>
   );
 }

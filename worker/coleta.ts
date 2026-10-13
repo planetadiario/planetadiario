@@ -24,6 +24,7 @@ export interface Config {
   horarios_pico?: [number, number][];
   meta_posts_dia?: number;
   urgente_automatico?: boolean;
+  grade_horarios?: string[];
 }
 
 export const CANAIS_TELEGRAM_PADRAO = [
@@ -227,6 +228,20 @@ async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[
 }
 
 /** Cria um Reel sozinho a partir do melhor assunto ainda não usado */
+/**
+ * Grade fixa de horários (Brasília), tirada de dados reais: horário e engajamento de 1.102 posts
+ * das maiores páginas de notícias do Brasil no Instagram (Choquei, Metrópoles, CNN Brasil, Folha, O Globo,
+ * UOL, Estadão, SBT News…), em 13/10/2026. Os picos de engajamento ficam às 13h, 15h, 17h, 19h, 21h e 22h.
+ * Editável em Ajustes → Automação.
+ */
+export const GRADE_PADRAO = ["08:00", "11:00", "12:30", "13:30", "15:00", "17:00", "19:00", "20:00", "21:00", "22:00"];
+
+/** minutos desde a meia-noite em Brasília */
+function minutosBrasilia(d = new Date()) {
+  const [h, m] = d.toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).split(":").map(Number);
+  return h * 60 + m;
+}
+
 async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, log: string[]) {
   const inicioDia = new Date();
   inicioDia.setUTCHours(3, 0, 0, 0); // meia-noite em Brasília
@@ -238,18 +253,15 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .gte("criado_em", inicioDia.toISOString())
     .not("status", "in", "(rejeitado,erro)");
   const feitosHoje = count ?? 0;
+  if (feitosHoje >= cfg.max_posts_dia) return log.push("piloto: limite diário atingido");
 
-  const hora = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hourCycle: "h23" }));
-  const janelas = cfg.horarios_pico?.length ? cfg.horarios_pico : [[7, 9], [11, 14], [17, 23]];
+  // nunca mais de 2 Reels montando ao mesmo tempo
+  const { count: emProducao } = await db
+    .from("reels")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["na_fila", "processando", "publicando"]);
+  if ((emProducao ?? 0) >= 2) return;
 
-  // ritmo: se estiver atrás da meta do dia, aceita nota um pouco menor
-  const minutosPico = janelas.reduce((s, [a, b]) => s + (b - a) * 60, 0);
-  const minutosPassados = janelas.reduce((s, [a, b]) => s + Math.max(0, Math.min(hora, b) - a) * 60, 0);
-  const esperado = Math.floor(((cfg.meta_posts_dia ?? 8) * minutosPassados) / Math.max(1, minutosPico));
-  const atrasado = feitosHoje < esperado;
-  const notaMinima = atrasado ? Math.max(45, cfg.score_minimo_auto - 5) : cfg.score_minimo_auto; // nota FINAL mínima
-
-  // candidatos: nota da IA >= 50 (qualidade mínima); a ordem usa a nota final (IA + popularidade real)
   const desde = new Date(Date.now() - 12 * 3600_000).toISOString();
   const { data: brutos } = await db
     .from("tendencias")
@@ -260,35 +272,45 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .gte("detectado_em", desde)
     .order("score", { ascending: false })
     .limit(80);
-  const candidatos = (brutos ?? [])
-    .map((t) => ({ ...t, nota_final: notaFinal(t) }))
-    .filter((t) => t.nota_final >= notaMinima)
-    .sort((a, b) => b.nota_final - a.nota_final)
-    .slice(0, 5);
-  if (!candidatos[0]) return;
+  const todos = (brutos ?? []).map((t) => ({ ...t, nota_final: notaFinal(t) })).sort((a, b) => b.nota_final - a.nota_final);
 
-  // publica na hora em que a notícia sai, a qualquer hora do dia: perder o momento é perder as visualizações
-  if (feitosHoje >= cfg.max_posts_dia) return log.push("piloto: limite diário atingido");
+  // 1) URGENTE fura a grade: sai na hora em que acontece (notícia urgente recente, com nota alta)
+  const urgentes = todos.filter(
+    (t) => t.categoria === "urgente" && t.nota_final >= 70 && Date.now() - Date.parse(String(t.detectado_em)) < 90 * 60_000,
+  );
+  let candidatos: typeof todos = [];
+  if (urgentes.length && cfg.urgente_automatico === true) {
+    const { data: ultimo } = await db.from("reels").select("criado_em").neq("status", "rejeitado").order("criado_em", { ascending: false }).limit(1).maybeSingle();
+    if (!ultimo || Date.now() - Date.parse(ultimo.criado_em) > 10 * 60_000) {
+      candidatos = urgentes.slice(0, 3);
+      log.push(`piloto: URGENTE — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
+    }
+  }
 
-  // até 2 Reels em produção ao mesmo tempo (a montagem leva ~4 min)
-  const { count: emProducao } = await db
-    .from("reels")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["na_fila", "processando", "publicando"]);
-  if ((emProducao ?? 0) >= 2) return;
-
-  // intervalo mínimo entre publicações automáticas
-  const intervalo = cfg.intervalo_min_minutos ?? 15;
-  const { data: ultimo } = await db
-    .from("reels")
-    .select("publicado_em")
-    .eq("status", "publicado")
-    .order("publicado_em", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (ultimo?.publicado_em && Date.now() - Date.parse(ultimo.publicado_em) < intervalo * 60_000) return;
-
-  log.push(`piloto: melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
+  // 2) GRADE: em cada horário sai exatamente um Reel (começa a montar 8 min antes, para sair no horário)
+  if (!candidatos.length) {
+    const grade = (cfg.grade_horarios?.length ? cfg.grade_horarios : GRADE_PADRAO).map((h) => {
+      const [hh, mm] = h.split(":").map(Number);
+      return hh * 60 + (mm || 0);
+    });
+    const agora = minutosBrasilia();
+    const horario = grade.find((g) => agora >= g - 8 && agora < g + 25);
+    if (horario == null) return;
+    // este horário já foi atendido? (Reel criado a partir de 8 min antes dele, sem contar os urgentes)
+    const inicioHorario = new Date(Date.now() - (agora - (horario - 8)) * 60_000).toISOString();
+    const { count: feitos } = await db
+      .from("reels")
+      .select("id", { count: "exact", head: true })
+      .gte("criado_em", inicioHorario)
+      .neq("status", "rejeitado")
+      .neq("categoria", "urgente");
+    if ((feitos ?? 0) > 0) return;
+    // constância acima de tudo: se nada passar da nota mínima, usa o melhor disponível (nota da IA >= 50)
+    const bons = todos.filter((t) => t.nota_final >= cfg.score_minimo_auto);
+    candidatos = (bons.length ? bons : todos).slice(0, 5);
+    if (!candidatos.length) return log.push(`piloto: horário ${String(Math.floor(horario / 60)).padStart(2, "0")}:${String(horario % 60).padStart(2, "0")} sem candidatos`);
+    log.push(`piloto: horário ${String(Math.floor(horario / 60)).padStart(2, "0")}:${String(horario % 60).padStart(2, "0")} — melhor candidato ${candidatos[0].nota_final} — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
+  }
 
   // assuntos e vídeos publicados nas últimas 24 h: nunca repetir o mesmo vídeo nem o mesmo assunto
   const { data: recentes } = await db
