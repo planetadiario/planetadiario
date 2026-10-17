@@ -93,13 +93,32 @@ function normalizar(itens: Analise[]): Analise[] {
     .map((i) => ({ ...i, score: Math.max(0, Math.min(100, Math.round(Number(i.score) || 0))) }));
 }
 
+/** Reserva: se a NVIDIA desativar o modelo principal (aconteceu com o Kimi K3), usa o próximo sem parar o sistema */
+const RESERVA_NVIDIA = ["nvidia/nemotron-3.5-super-vl-120b-a12b", "nvidia/nemotron-3-super-120b-a12b", "z-ai/glm-5.3"];
+
 /** Modelos abertos via NVIDIA (API compatível com OpenAI) */
 export async function nvidiaJson<T>(env: Bindings, sistema: string, usuario: string, esquema: object): Promise<T> {
+  const modelos = [...new Set([env.IA_MODELO, ...RESERVA_NVIDIA])];
+  let ultimoErro: Error | null = null;
+  for (const modelo of modelos) {
+    try {
+      return await nvidiaJsonModelo<T>(env, modelo, sistema, usuario, esquema);
+    } catch (e) {
+      ultimoErro = e as Error;
+      // só troca de modelo se este deixou de existir; limite (429) e instabilidade voltam para quem chamou tentar de novo
+      if (!/HTTP (404|410)/.test(ultimoErro.message)) throw e;
+      console.log(`modelo ${modelo} indisponível, usando o próximo`);
+    }
+  }
+  throw ultimoErro ?? new Error("NVIDIA: nenhum modelo disponível");
+}
+
+async function nvidiaJsonModelo<T>(env: Bindings, modelo: string, sistema: string, usuario: string, esquema: object): Promise<T> {
   const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.NVIDIA_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: env.IA_MODELO,
+      model: modelo,
       max_tokens: 16000,
       temperature: 0.3,
       messages: [

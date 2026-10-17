@@ -1,4 +1,4 @@
-"""Gera manchete, legenda e hashtags do Reel (NVIDIA/Kimi ou Claude, conforme IA_MODELO)."""
+"""Gera manchete, legenda e hashtags do Reel (NVIDIA/Nemotron ou Claude, conforme IA_MODELO)."""
 import json
 import os
 import re
@@ -78,7 +78,23 @@ def sistema(aprendizados: str = "") -> str:
             "sem nunca sacrificar a veracidade):\n" + aprendizados)
 
 
+# reserva: se a NVIDIA desativar o modelo (aconteceu com o Kimi K3), usa o próximo; (modelo, vê imagens?)
+RESERVA_NVIDIA = [("nvidia/nemotron-3.5-super-vl-120b-a12b", True), ("nvidia/nemotron-3-super-120b-a12b", False), ("z-ai/glm-5.3", False)]
+
+
 def _nvidia(modelo: str, usuario: str, prompt: str, imagens: list[str]) -> dict:
+    tentativas = [(modelo, True)] + [r for r in RESERVA_NVIDIA if r[0] != modelo]
+    for i, (m, ve_imagens) in enumerate(tentativas):
+        try:
+            return _nvidia_modelo(m, usuario, prompt, imagens if ve_imagens else [])
+        except requests.HTTPError as e:
+            if e.response is None or e.response.status_code not in (404, 410) or i == len(tentativas) - 1:
+                raise
+            print(f"aviso: modelo {m} indisponível ({e.response.status_code}), usando o próximo")
+    raise RuntimeError("nenhum modelo disponível")
+
+
+def _nvidia_modelo(modelo: str, usuario: str, prompt: str, imagens: list[str]) -> dict:
     r = requests.post(
         "https://integrate.api.nvidia.com/v1/chat/completions",
         headers={"Authorization": f"Bearer {os.environ['NVIDIA_API_KEY']}"},
@@ -102,7 +118,7 @@ def _nvidia(modelo: str, usuario: str, prompt: str, imagens: list[str]) -> dict:
 
 
 def gerar_textos(contexto: dict, aprendizados: str = "", imagens: list[str] | None = None) -> dict:
-    modelo = os.environ.get("IA_MODELO", "moonshotai/kimi-k3")
+    modelo = os.environ.get("IA_MODELO", "nvidia/nemotron-3.5-super-vl-120b-a12b")
     imagens = imagens or []
     usuario = "Informações sobre o vídeo:\n" + json.dumps(contexto, ensure_ascii=False, indent=2)
     if imagens:

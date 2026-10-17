@@ -24,8 +24,9 @@
     "SITE_URL": "https://planetadiario.online",
     "GITHUB_REPO": "planetadiario/planetadiario",
     "FB_GRAPH_VERSION": "v23.0",
-    // IA: "moonshotai/kimi-k3" (NVIDIA, grátis) ou "claude-opus-5-5" (Anthropic)
-    "IA_MODELO": "moonshotai/kimi-k3"
+    // IA: "nvidia/nemotron-3.5-super-vl-120b-a12b" (NVIDIA, grátis, vê imagens) ou "claude-opus-5-5" (Anthropic)
+    // o Kimi K3 foi desativado pela NVIDIA em out/2026; há lista de reserva em worker/ia.ts
+    "IA_MODELO": "nvidia/nemotron-3.5-super-vl-120b-a12b"
   }
   // Segredos (wrangler secret put): SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY,
   // LYTEX_CLIENT_ID, LYTEX_CLIENT_SECRET, LYTEX_CALLBACK_SECRET, NVIDIA_API_KEY, GITHUB_TOKEN, FB_PAGE_ID, FB_PAGE_TOKEN, YOUTUBE_API_KEY, INTERNAL_SECRET

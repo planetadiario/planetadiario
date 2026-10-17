@@ -38,9 +38,9 @@ begin
     'visitas', (select count(*) from visitas where criado_em >= desde),
     'visitantes', (select count(distinct visitante) from visitas where criado_em >= desde),
     'online', (select count(distinct visitante) from visitas where criado_em >= now() - interval '5 minutes'),
-    'por_dia', coalesce((select jsonb_agg(x order by x->>'dia') from (
-        select jsonb_build_object('dia', (criado_em at time zone 'America/Sao_Paulo')::date, 'visitas', count(*), 'visitantes', count(distinct visitante)) x
-        from visitas where criado_em >= desde group by 1 ) d), '[]'),
+    'por_dia', coalesce((select jsonb_agg(jsonb_build_object('dia', dia, 'visitas', n, 'visitantes', u) order by dia) from (
+        select (criado_em at time zone 'America/Sao_Paulo')::date dia, count(*) n, count(distinct visitante) u
+        from visitas where criado_em >= desde group by 1) d), '[]'),
     'origens', coalesce((select jsonb_agg(x) from (
         select jsonb_build_object('origem', coalesce(origem, 'direto'), 'visitas', count(*)) x
         from visitas where criado_em >= desde group by coalesce(origem, 'direto') order by count(*) desc limit 10) o), '[]'),
@@ -53,8 +53,8 @@ begin
     'cadastros_total', (select count(*) from perfis),
     'cadastros_periodo', (select count(*) from perfis where criado_em >= desde),
     'cadastros_hoje', (select count(*) from perfis where criado_em >= date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'),
-    'cadastros_por_dia', coalesce((select jsonb_agg(x order by x->>'dia') from (
-        select jsonb_build_object('dia', (criado_em at time zone 'America/Sao_Paulo')::date, 'n', count(*)) x
+    'cadastros_por_dia', coalesce((select jsonb_agg(jsonb_build_object('dia', dia, 'n', n) order by dia) from (
+        select (criado_em at time zone 'America/Sao_Paulo')::date dia, count(*) n
         from perfis where criado_em >= desde group by 1) c), '[]'),
     'assinantes', (select count(distinct usuario_id) from assinaturas where status = 'ativa' and fim > now()),
     'fundadores', (select count(*) from fundadores where status = 'ativo'),
