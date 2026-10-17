@@ -32,6 +32,7 @@ interface Cfg {
   meta_posts_dia?: number;
   horarios_pico?: [number, number][];
   grade_horarios?: string[];
+  temas_monitorados?: string[];
   urgente_automatico?: boolean;
   adsense?: { client: string; slot_home: string; slot_artigo: string };
 }
@@ -186,6 +187,12 @@ export default function Ajustes() {
 
       {aba === "fontes" && (
         <div className="grid gap-5 lg:grid-cols-2">
+          <ListaEditavel
+            titulo="Temas monitorados"
+            ajuda="Assuntos que o sistema acompanha de perto em notícias e vídeos (ex.: A Fazenda, BBB, Copa). Separados por vírgula, até 5."
+            valores={cfg.temas_monitorados ?? ["A Fazenda"]}
+            salvar={(v) => gravar("temas_monitorados", v.slice(0, 5))}
+          />
           <ListaEditavel titulo="Países monitorados" ajuda="Códigos separados por vírgula (BR, US, GB…)" valores={cfg.paises} salvar={(v) => gravar("paises", v.map((p) => p.toUpperCase()))} />
           <ListaEditavel titulo="Canais/autores bloqueados" ajuda="Vídeos desses autores nunca são usados" valores={cfg.fontes_bloqueadas} salvar={(v) => gravar("fontes_bloqueadas", v)} />
           <ListaEditavel

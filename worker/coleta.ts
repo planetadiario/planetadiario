@@ -25,6 +25,8 @@ export interface Config {
   meta_posts_dia?: number;
   urgente_automatico?: boolean;
   grade_horarios?: string[];
+  temas_monitorados?: string[];
+  viral_minimo_fontes?: number;
 }
 
 export const CANAIS_TELEGRAM_PADRAO = [
@@ -67,12 +69,23 @@ export async function coletar(env: Bindings, forcarGrupo?: "par" | "impar") {
   const paises = ["BR", ...new Set([outros[(meia * 2) % outros.length], outros[(meia * 2 + 1) % outros.length]])];
   const canal = CANAIS_DM[meia % CANAIS_DM.length];
 
+  // temas que o editor quer acompanhar de perto (ex.: reality show do momento)
+  const temas = (cfg.temas_monitorados ?? ["A Fazenda"]).filter(Boolean).slice(0, 5);
   const tarefas: Promise<Tendencia[]>[] = [];
   let grupo: string;
   if (forcarGrupo ? forcarGrupo === "par" : rodada % 2 === 0) {
     grupo = `trends/youtube/dailymotion ${paises.join(",")} (${canal})`;
     for (const p of paises) tarefas.push(googleTrends(p), dailymotion(p, "news"), youtubeEmAlta(env, p));
     tarefas.push(dailymotion("BR", canal), dailymotion("US", canal));
+    // vídeos dos temas escolhidos pelo editor (YouTube só em 1 a cada 4 rodadas, pela cota)
+    for (const tema of temas) {
+      const alvo = normalizar(tema);
+      tarefas.push(
+        buscarVideos(env, `"${tema}"`, rodada % 4 === 0).then((vs) =>
+          vs.filter((v) => normalizar(v.titulo).includes(alvo)).map((v) => ({ ...v, extra: { ...(v.extra ?? {}), tema } })),
+        ),
+      );
+    }
   } else {
     // 5 canais do Telegram por rodada, em rodízio
     const canais = cfg.telegram_canais?.length ? cfg.telegram_canais : CANAIS_TELEGRAM_PADRAO;
@@ -118,7 +131,10 @@ export async function coletar(env: Bindings, forcarGrupo?: "par" | "impar") {
     if (error) log.push(`upsert: ${error.message}`);
   }
 
-  await analisarPendentes(env, db, log, cfg.aprendizados?.texto ?? "");
+  const avisoTemas = temas.length
+    ? `${String.fromCharCode(10)}Temas em alta escolhidos pelo editor (${temas.join(", ")}): o público brasileiro acompanha muito; notícias e vídeos desses temas merecem nota alta quando forem novidade real.`
+    : "";
+  await analisarPendentes(env, db, log, (cfg.aprendizados?.texto ?? "") + avisoTemas);
 
   // assuntos quentes sem vídeo: procura um vídeo e já deixa pronto no Radar
   // (busca no YouTube custa 100 de cota; só em 1 a cada 4 rodadas para caber nos 10 mil/dia)
@@ -168,8 +184,9 @@ export function preNota(t: Tendencia): number {
     default: base = 35;
   }
   const video = t.video_url ? 10 : 0;
+  const tema = t.extra?.tema ? 15 : 0; // tema escolhido pelo editor entra antes na análise
   const curto = Number(t.extra?.duracao ?? 60) <= 180 ? 5 : -15;
-  return base * (0.4 + 0.6 * frescor) + video + curto;
+  return base * (0.4 + 0.6 * frescor) + video + curto + tema;
 }
 
 async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[], aprendizados: string) {
@@ -272,18 +289,39 @@ async function pilotoAutomatico(env: Bindings, db: SupabaseClient, cfg: Config, 
     .gte("detectado_em", desde)
     .order("score", { ascending: false })
     .limit(80);
-  const todos = (brutos ?? []).map((t) => ({ ...t, nota_final: notaFinal(t) })).sort((a, b) => b.nota_final - a.nota_final);
+  const todos = (brutos ?? []).map((t) => ({ ...t, nota_final: notaFinal(t), repercussao: 1 }));
+
+  // REPERCUSSÃO: a mesma notícia aparecendo em várias fontes e países ao mesmo tempo (foi o caso do tigre).
+  // Conta fontes/países distintos com o mesmo assunto nas últimas 8 h; quanto mais, maior a nota.
+  const { data: vistas } = await db
+    .from("tendencias")
+    .select("titulo, titulo_pt, fonte, pais")
+    .eq("analisado", true)
+    .gte("detectado_em", new Date(Date.now() - 8 * 3600_000).toISOString())
+    .limit(2000);
+  const assuntosVistos = (vistas ?? []).map((v) => ({ p: palavras(v.titulo_pt ?? v.titulo), origem: `${v.fonte}:${v.pais ?? ""}` }));
+  for (const t of todos.slice(0, 40)) {
+    const p = palavras(t.titulo_pt ?? t.titulo);
+    const origens = new Set(assuntosVistos.filter((v) => parecido(p, v.p)).map((v) => v.origem));
+    t.repercussao = Math.max(1, origens.size);
+    t.nota_final = Math.min(100, t.nota_final + Math.min(15, (t.repercussao - 1) * 3));
+  }
+  todos.sort((a, b) => b.nota_final - a.nota_final);
 
   // 1) URGENTE fura a grade: sai na hora em que acontece (notícia urgente recente, com nota alta)
+  const viralMinimo = cfg.viral_minimo_fontes ?? 4;
   const urgentes = todos.filter(
-    (t) => t.categoria === "urgente" && t.nota_final >= 70 && Date.now() - Date.parse(String(t.detectado_em)) < 90 * 60_000,
+    (t) =>
+      ((t.categoria === "urgente" && t.nota_final >= 70) || (t.repercussao >= viralMinimo && t.nota_final >= 65)) &&
+      Date.now() - Date.parse(String(t.detectado_em)) < 3 * 3600_000,
   );
   let candidatos: typeof todos = [];
   if (urgentes.length && cfg.urgente_automatico === true) {
     const { data: ultimo } = await db.from("reels").select("criado_em").neq("status", "rejeitado").order("criado_em", { ascending: false }).limit(1).maybeSingle();
     if (!ultimo || Date.now() - Date.parse(ultimo.criado_em) > 10 * 60_000) {
       candidatos = urgentes.slice(0, 3);
-      log.push(`piloto: URGENTE — ${candidatos[0].titulo_pt ?? candidatos[0].titulo}`);
+      const c = candidatos[0];
+      log.push(`piloto: ${c.categoria === "urgente" ? "URGENTE" : `VIRAL em ${c.repercussao} fontes`} — ${c.titulo_pt ?? c.titulo}`);
     }
   }
 
@@ -504,4 +542,9 @@ async function videoDoFato(env: Bindings, noticia: string, videos: Tendencia[]) 
     const p = palavras(noticia);
     return opcoes.find((v) => parecido(p, palavras(v.titulo))) ?? null;
   }
+}
+
+/** minúsculas e sem acentos, para comparar textos */
+function normalizar(texto: string) {
+  return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }

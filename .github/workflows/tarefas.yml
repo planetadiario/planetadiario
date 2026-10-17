@@ -19,6 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
+        if: startsWith(inputs.rota, 'coletar')
+      - name: Google Notícias (temas monitorados e manchetes do Brasil)
+        # o Google bloqueia os servidores do Cloudflare; daqui funciona
+        if: startsWith(inputs.rota, 'coletar')
+        continue-on-error: true
+        env:
+          SUPABASE_URL: https://ilnmrhgnaojgykkresfi.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 pipeline/temas.py
       - name: Executar
         env:
           ROTA: ${{ inputs.rota }}
