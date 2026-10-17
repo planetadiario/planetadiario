@@ -196,7 +196,7 @@ async function analisarPendentes(env: Bindings, db: SupabaseClient, log: string[
           break;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          if (tentativa === 2 || !/429|524|503|502/.test(msg)) {
+          if (tentativa === 2 || !/429|524|503|502|500/.test(msg)) {
             log.push(`analise lote ${i / 15 + 1}: ${msg.slice(0, 120)}`);
             break;
           }

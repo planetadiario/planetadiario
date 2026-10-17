@@ -106,7 +106,7 @@ export async function nvidiaJson<T>(env: Bindings, sistema: string, usuario: str
     } catch (e) {
       ultimoErro = e as Error;
       // só troca de modelo se este deixou de existir; limite (429) e instabilidade voltam para quem chamou tentar de novo
-      if (!/HTTP (404|410)/.test(ultimoErro.message)) throw e;
+      if (!/HTTP (404|410|500)/.test(ultimoErro.message)) throw e;
       console.log(`modelo ${modelo} indisponível, usando o próximo`);
     }
   }

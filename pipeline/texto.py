@@ -88,7 +88,7 @@ def _nvidia(modelo: str, usuario: str, prompt: str, imagens: list[str]) -> dict:
         try:
             return _nvidia_modelo(m, usuario, prompt, imagens if ve_imagens else [])
         except requests.HTTPError as e:
-            if e.response is None or e.response.status_code not in (404, 410) or i == len(tentativas) - 1:
+            if e.response is None or e.response.status_code not in (404, 410, 500) or i == len(tentativas) - 1:
                 raise
             print(f"aviso: modelo {m} indisponível ({e.response.status_code}), usando o próximo")
     raise RuntimeError("nenhum modelo disponível")
