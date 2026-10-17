@@ -111,10 +111,16 @@ def _nvidia_modelo(modelo: str, usuario: str, prompt: str, imagens: list[str]) -
     )
     r.raise_for_status()
     texto = r.json()["choices"][0]["message"]["content"] or ""
-    m = re.search(r"\{.*\}", texto, re.S)
-    if not m:
-        raise RuntimeError("IA não devolveu JSON")
-    return json.loads(m.group(0))
+    # o primeiro objeto JSON da resposta, mesmo com texto antes ou depois (o Nemotron às vezes comenta no fim)
+    dec = json.JSONDecoder()
+    for m in re.finditer(r"\{", texto):
+        try:
+            obj, _ = dec.raw_decode(texto, m.start())
+            if isinstance(obj, dict):
+                return obj
+        except ValueError:
+            continue
+    raise RuntimeError("IA não devolveu JSON")
 
 
 def gerar_textos(contexto: dict, aprendizados: str = "", imagens: list[str] | None = None) -> dict:

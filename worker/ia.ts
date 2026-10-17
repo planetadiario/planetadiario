@@ -132,7 +132,29 @@ ${JSON.stringify(esquema)}` },
   });
   if (!r.ok) throw new Error(`NVIDIA: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   const d = (await r.json()) as { choices: { message: { content: string } }[] };
-  const json = d.choices[0]?.message.content?.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) throw new Error("NVIDIA: resposta sem JSON");
-  return JSON.parse(json) as T;
+  return primeiroJson(d.choices[0]?.message.content ?? "") as T;
+}
+
+/** Lê o primeiro objeto JSON da resposta, mesmo com texto antes ou depois (o Nemotron às vezes comenta no fim) */
+export function primeiroJson(texto: string): unknown {
+  for (let ini = texto.indexOf("{"); ini >= 0; ini = texto.indexOf("{", ini + 1)) {
+    let nivel = 0;
+    let emTexto = false;
+    for (let i = ini; i < texto.length; i++) {
+      const c = texto[i];
+      if (emTexto) {
+        if (c === "\\") i++;
+        else if (c === '"') emTexto = false;
+      } else if (c === '"') emTexto = true;
+      else if (c === "{") nivel++;
+      else if (c === "}" && --nivel === 0) {
+        try {
+          return JSON.parse(texto.slice(ini, i + 1));
+        } catch {
+          break; // não era JSON válido: tenta a partir da próxima chave
+        }
+      }
+    }
+  }
+  throw new Error("NVIDIA: resposta sem JSON");
 }

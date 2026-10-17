@@ -9,3 +9,4 @@ __pycache__/
 pipeline/tmp/
 supabase/.temp/
 pipeline/vozes/
+.cloudflare.env
